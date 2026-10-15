@@ -231,8 +231,16 @@ function ensureHeaders(sheet) {
   const existing = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), HEADERS.length))
     .getDisplayValues()[0];
   if (existing[0] !== HEADERS[0]) {
-    throw new Error('The first row of "' + SHEET_NAME + '" does not match the expected headers. Rename or clear that sheet before first use.');
+    throw new Error('The first row of "' + SHEET_NAME + '" does not match the expected headers.');
   }
+  // Add any newly introduced columns without disturbing existing records.
+  HEADERS.forEach(function(header, i) {
+    if (String(existing[i] || '').trim() !== header) {
+      sheet.getRange(1, i + 1).setValue(header)
+        .setFontWeight('bold').setBackground('#650909').setFontColor('#ffffff');
+    }
+  });
+  sheet.setFrozenRows(1);
 }
 
 function joinValue(value) {
