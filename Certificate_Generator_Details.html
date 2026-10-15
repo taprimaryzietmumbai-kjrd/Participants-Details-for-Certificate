@@ -91,6 +91,7 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
 <div class="toast" id="toast" role="status"></div>
 <script>
 const STORAGE_KEY='ziet-participants-details-certificate-register-v1';
+const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwzUPBSLEJjofDGkUmH_-AyXVu8SyAmye2oG_HUQhwugA8yycHOJ5_Jl7sNhLcfXYXcMA/exec';
 const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 let data=[],editingId=null;
 const $=id=>document.getElementById(id);
@@ -99,10 +100,28 @@ function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
 function formData(){const o={};fields.forEach(k=>{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim()});return o}
 function clearForm(){ $('entryForm').reset();$('formTitle').textContent='प्रतिभागी का विवरण जोड़ें / Add participant details';$('saveBtn').textContent='＋ विवरण सहेजें / Save record';editingId=null}
-$('entryForm').addEventListener('submit',e=>{e.preventDefault();const o=formData();if(!o.salutation.length||!o.fullNameHi||!o.fullNameEn||!o.recordType||!o.workshopTitleHi||!o.workshopTitleEn||!o.startDate||!o.endDate||!o.designationHi||!o.designationEn||!o.schoolHi||!o.schoolEn||!o.regionHi||!o.regionEn||!o.gender||!o.category.length||o.cpd===''||!o.certDate||!o.attendance||!o.notesHi||!o.notesEn){toast('कृपया सभी फ़ील्ड भरें; कोई भी फ़ील्ड वैकल्पिक नहीं है / Please complete every field; no field is optional.');return} if(o.endDate<o.startDate){toast('समाप्ति तिथि प्रारंभ तिथि से पहले नहीं हो सकती / End date cannot be earlier than start date.');return}
-if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]={...data[i],...o};toast('रिकॉर्ड अपडेट हुआ / Record updated.')}
-else{data.unshift({id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random(),createdAt:new Date().toISOString(),...o});toast('रिकॉर्ड इस डिवाइस पर सहेजा गया / Record saved on this device.')}
-persist();clearForm()});
+$('entryForm').addEventListener('submit',async e=>{
+e.preventDefault();
+const o=formData();
+if(!o.salutation.length||!o.fullNameHi||!o.fullNameEn||!o.recordType||!o.workshopTitleHi||!o.workshopTitleEn||!o.startDate||!o.endDate||!o.designationHi||!o.designationEn||!o.schoolHi||!o.schoolEn||!o.regionHi||!o.regionEn||!o.gender||!o.category.length||o.cpd===''||!o.certDate||!o.attendance||!o.notesHi||!o.notesEn){toast('कृपया सभी फ़ील्ड भरें; कोई भी फ़ील्ड वैकल्पिक नहीं है / Please complete every field; no field is optional.');return}
+if(o.endDate<o.startDate){toast('समाप्ति तिथि प्रारंभ तिथि से पहले नहीं हो सकती / End date cannot be earlier than start date.');return}
+const existing=editingId?data.find(x=>x.id===editingId):null;
+const record={...(existing||{}),id:existing?.id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),createdAt:existing?.createdAt||new Date().toISOString(),...o};
+const btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving… / सहेजा जा रहा है';
+try{
+  // Apps Script accepts text/plain cross-origin requests; no-cors prevents the browser from exposing the response.
+  await fetch(SHEETS_WEB_APP_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'save',record})});
+  if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}
+  else data.unshift(record);
+  persist();clearForm();
+  toast('Save request sent to Google Sheets. Please verify the Participant Records tab.');
+}catch(err){
+  // Keep the record locally so the user's entry is not lost.
+  if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}else data.unshift(record);
+  persist();
+  toast('Saved in this browser, but Sheets connection could not be confirmed. Export a CSV backup and retry.');
+}finally{btn.disabled=false;btn.textContent=editingId?'परिवर्तन सहेजें / Save changes':'＋ विवरण सहेजें / Save record';}
+});
 $('resetBtn').onclick=clearForm;
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){const q=$('search').value.toLowerCase(),type=$('typeFilter').value;
