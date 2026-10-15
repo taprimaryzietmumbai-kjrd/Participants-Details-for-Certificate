@@ -78,7 +78,7 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
       <h2>प्रतिभागियों का विवरण / Participant records</h2><p class="sub">विवरण खोजें, संपादित करें, निर्यात करें या प्रिंट करें। / Search, edit, export or print the register.</p>
       <div class="toolbar">
         <input id="search" placeholder="नाम, विद्यालय या संभाग खोजें… / Search name, school or region…">
-        <select id="typeFilter"><option value="">सभी श्रेणियाँ / All categories</option><option>प्रतिभागी / Participant</option><option>संसाधन व्यक्ति / Resource Person</option></select>
+        <select id="typeFilter"><option value="">सभी श्रेणियाँ / All categories</option><option value="Participant">प्रतिभागी / Participant</option><option value="Resource Person">संसाधन व्यक्ति / Resource Person</option></select>
         <button class="plain" id="exportCsv">CSV निर्यात करें / Export CSV</button>
         <label class="filelabel plain" for="importCsv">CSV आयात करें / Import CSV</label><input id="importCsv" type="file" accept=".csv,text/csv" hidden>
         <button class="plain" id="printBtn">प्रिंट करें / Print</button>
@@ -88,28 +88,16 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
     </section>
   </div>
 </div>
-<div id="driveSetup" style="display:none;position:fixed;inset:0;background:#0008;z-index:10;padding:20px;align-items:center;justify-content:center">
-  <section class="panel" style="width:min(560px,100%);max-height:90vh;overflow:auto">
-    <h2>Google Drive setup / Google Drive सेटअप</h2>
-    <p class="sub">To save PDFs directly to Drive, enter your deployed Google Apps Script Web App URL. The web app must be configured to accept a PDF upload and save it to your chosen Drive folder.</p>
-    <label for="driveUrl">Apps Script Web App URL / वेब ऐप URL</label>
-    <input id="driveUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
-    <label for="driveFolder" style="margin-top:12px">Drive folder ID (optional if configured in script) / फ़ोल्डर ID</label>
-    <input id="driveFolder" placeholder="Google Drive folder ID">
-    <div class="actions"><button class="primary" id="saveDriveSetup">Save settings / सेटिंग सहेजें</button><button class="plain" id="cancelDriveSetup">Cancel / रद्द करें</button></div>
-    <p class="footnote">No Google Drive upload is performed until a valid Apps Script endpoint is configured. This page cannot write to Drive directly without Google authorization and a backend.</p>
-  </section>
-</div>
 <div class="toast" id="toast" role="status"></div>
 <script>
-const STORAGE_KEY='ziet-mumbai-music-certificate-register-v1';
+const STORAGE_KEY='ziet-participants-details-certificate-register-v1';
 const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 let data=[],editingId=null;
 const $=id=>document.getElementById(id);
 function load(){try{data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){data=[]}render()}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render()}
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
-function formData(){const o={};fields.forEach(k=>{o[k]=k==='category'?Array.from($('category').selectedOptions).map(opt=>opt.value):$(k).value.trim()});return o}
+function formData(){const o={};fields.forEach(k=>{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim()});return o}
 function clearForm(){ $('entryForm').reset();$('formTitle').textContent='प्रतिभागी का विवरण जोड़ें / Add participant details';$('saveBtn').textContent='＋ विवरण सहेजें / Save record';editingId=null}
 $('entryForm').addEventListener('submit',e=>{e.preventDefault();const o=formData();if(!o.salutation.length||!o.fullNameHi||!o.fullNameEn||!o.recordType||!o.workshopTitleHi||!o.workshopTitleEn||!o.startDate||!o.endDate||!o.designationHi||!o.designationEn||!o.schoolHi||!o.schoolEn||!o.regionHi||!o.regionEn||!o.gender||!o.category.length||o.cpd===''||!o.certDate||!o.attendance||!o.notesHi||!o.notesEn){toast('कृपया सभी फ़ील्ड भरें; कोई भी फ़ील्ड वैकल्पिक नहीं है / Please complete every field; no field is optional.');return} if(o.endDate<o.startDate){toast('समाप्ति तिथि प्रारंभ तिथि से पहले नहीं हो सकती / End date cannot be earlier than start date.');return}
 if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]={...data[i],...o};toast('रिकॉर्ड अपडेट हुआ / Record updated.')}
@@ -122,21 +110,12 @@ $('total').textContent=data.length;$('participants').textContent=data.filter(x=>
 const rows=data.filter(x=>(!type||x.recordType===type)&&Object.values(x).join(' ').toLowerCase().includes(q));
 $('records').innerHTML=rows.map(x=>`<tr><td><div class="name">${esc((x.fullNameHi||'')+' / '+(x.fullNameEn||''))}</div><div class="muted">${esc((x.designationHi||'')+' / '+(x.designationEn||''))}</div><div style="margin-top:5px"><span class="pill">${esc(x.recordType)}</span></div></td><td>${esc((x.schoolHi||'')+' / '+(x.schoolEn||''))}<div class="muted">${esc((x.regionHi||'')+' / '+(x.regionEn||''))}</div></td><td><div>${esc((x.workshopTitleHi||'')+' / '+(x.workshopTitleEn||''))}</div><div class="muted">${esc(x.startDate||'—')} to ${esc(x.endDate||'—')}</div><div class="muted">प्रमाण-पत्र date: ${esc(x.certDate||'—')}</div></td><td>${esc(x.attendance||'—')}<div class="muted">श्रेणी / Category: ${esc(Array.isArray(x.category)?x.category.join(', '):(x.category||'—'))}</div></td><td><div class="rowactions"><button class="secondary" onclick="editRecord('${x.id}')">संपादित करें / Edit</button><button class="danger" onclick="deleteRecord('${x.id}')">हटाएँ / Delete</button></div></td></tr>`).join('');
 $('empty').style.display=rows.length?'none':'block'}
-window.editRecord=id=>{const x=data.find(y=>y.id===id);if(!x)return;fields.forEach(k=>{if(['category','salutation'].includes(k)){const vals=Array.isArray(x[k])?x[k]:(x[k]?[x[k]]:[]);Array.from($('category').options).forEach(opt=>opt.selected=vals.includes(opt.value));}else $(k).value=x[k]??''});editingId=id;$('formTitle').textContent='प्रतिभागी का विवरण संपादित करें / Edit participant record';$('saveBtn').textContent='परिवर्तन सहेजें / Save changes';window.scrollTo({top:0,behavior:'smooth'})};
+window.editRecord=id=>{const x=data.find(y=>y.id===id);if(!x)return;fields.forEach(k=>{if(['category','salutation'].includes(k)){const vals=Array.isArray(x[k])?x[k]:(x[k]?[x[k]]:[]);Array.from($(k).options).forEach(opt=>opt.selected=vals.includes(opt.value));}else $(k).value=x[k]??''});editingId=id;$('formTitle').textContent='प्रतिभागी का विवरण संपादित करें / Edit participant record';$('saveBtn').textContent='परिवर्तन सहेजें / Save changes';window.scrollTo({top:0,behavior:'smooth'})};
 window.deleteRecord=id=>{const x=data.find(y=>y.id===id);if(!x)return;if(confirm(`Delete the record for ${(Array.isArray(x.salutation)?x.salutation.join(' '):'')+' '+(x.fullNameEn||x.fullNameHi)}? This cannot be undone.`)){data=data.filter(y=>y.id!==id);persist();if(editingId===id)clearForm();toast('रिकॉर्ड हटाया गया / Record deleted.')}};
 $('search').addEventListener('input',render);$('typeFilter').addEventListener('change',render);$('printBtn').onclick=()=>window.print();
-const csvFields=['fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
+const csvFields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 function csvCell(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
 $('exportCsv').onclick=()=>{const blob=new Blob([currentRegisterCSV()],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ZIET_Mumbai_Certificate_Generator_Details.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV रजिस्टर निर्यात हुआ / CSV register exported.')};
-async function uploadRegisterToDrive(){
- const url=localStorage.getItem(DRIVE_URL_KEY);if(!url){$('driveSetup').style.display='flex';toast('Configure the Google Apps Script URL first.');return}
- const folder=localStorage.getItem(DRIVE_FOLDER_KEY)||'';
- const payload={filename:'ZIET_Mumbai_Certificate_Generator_Details.csv',mimeType:'text/csv',folderId:folder,content:currentRegisterCSV()};
- try{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});if(!res.ok)throw new Error('Upload endpoint returned '+res.status);toast('Upload request sent to Google Drive endpoint. Check the returned script response and Drive folder.')}
- catch(err){toast('Drive upload failed. Check Apps Script deployment, permissions, and CORS settings.')}
-}
-$('driveBtn').onclick=()=>{const url=localStorage.getItem(DRIVE_URL_KEY);if(!url){$('driveSetup').style.display='flex';return}uploadRegisterToDrive()};
-
 function parseCSV(text){const out=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c==='"'&&text[i+1]==='"'){cell+='"';i++}else if(c==='"')quoted=false;else cell+=c}else if(c==='"')quoted=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'){row.push(cell.replace(/\r$/,''));out.push(row);row=[];cell=''}else cell+=c}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));out.push(row)}return out}
 $('importCsv').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const rows=parseCSV(await f.text());const heads=rows.shift().map(x=>x.trim());let count=0;for(const r of rows){if(!r.some(Boolean))continue;const obj={};heads.forEach((h,i)=>{if(fields.includes(h))obj[h]=r[i]||''});if(!obj.fullNameHi&&!obj.fullNameEn)continue;data.push({id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),createdAt:new Date().toISOString(),recordType:'',cpd:'',certDate:'',attendance:'Pending verification',...obj});count++}persist();toast(`${count} रिकॉर्ड आयात हुए; कृपया जाँचें / Imported ${count} record(s); please verify.`)}catch(err){toast('CSV आयात नहीं हो सका। कॉलम शीर्षक जाँचें / Could not import CSV. Check column headings.')}e.target.value=''};
 
@@ -144,16 +123,6 @@ function currentRegisterCSV(){
  const rows=[csvFields.join(','),...data.map(x=>csvFields.map(k=>csvCell(Array.isArray(x[k])?x[k].join('; '):x[k])).join(','))].join('\r\n');
  return '\ufeff'+rows;
 }
-$('pdfBtn').onclick=()=>{
- const prior=document.title;document.title='Certificate Generator Details - Participant Register';
- window.print();document.title=prior;
-};
-const DRIVE_URL_KEY='ziet-certificate-drive-webapp-url', DRIVE_FOLDER_KEY='ziet-certificate-drive-folder-id';
-$('driveUrl').value=localStorage.getItem(DRIVE_URL_KEY)||'';
-$('driveFolder').value=localStorage.getItem(DRIVE_FOLDER_KEY)||'';
-$('driveBtn').onclick=()=>{$('driveSetup').style.display='flex'};
-$('cancelDriveSetup').onclick=()=>{$('driveSetup').style.display='none'};
-$('saveDriveSetup').onclick=()=>{const url=$('driveUrl').value.trim();if(!url||!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)){toast('Enter a valid deployed Apps Script Web App URL.');return}localStorage.setItem(DRIVE_URL_KEY,url);localStorage.setItem(DRIVE_FOLDER_KEY,$('driveFolder').value.trim());$('driveSetup').style.display='none';toast('Drive settings saved. Use Save to Google Drive to upload a CSV backup.');};
 load();
 </script>
 </body></html>
