@@ -109,13 +109,13 @@ const existing=editingId?data.find(x=>x.id===editingId):null;
 const record={...(existing||{}),id:existing?.id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),createdAt:existing?.createdAt||new Date().toISOString(),...o};
 const btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving… / सहेजा जा रहा है';
 try{
-  // Apps Script accepts text/plain cross-origin requests; no-cors prevents the browser from exposing the response.
+  // Send the request, but do not pretend the opaque no-cors response confirms success.
   await fetch(SHEETS_WEB_APP_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'save',record})});
   if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}
   else data.unshift(record);
-  persist();clearForm();
-  toast('Details submitted. Opening Certificate Generator…');
-  setTimeout(()=>{ window.location.href='https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/'; },900);
+  persist();
+  toast('Request sent. Server save/PDF status is not verifiable from this page; check the sheet before proceeding.');
+  // Keep the form and stay on this page. Do not redirect or clear the entry on an unverified response.
 }catch(err){
   // Keep the record locally so the user's entry is not lost.
   if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}else data.unshift(record);
