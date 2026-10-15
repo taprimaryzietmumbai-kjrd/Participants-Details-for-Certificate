@@ -114,7 +114,8 @@ try{
   if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}
   else data.unshift(record);
   persist();clearForm();
-  toast('Save request sent to Google Sheets. Please verify the Participant Records tab.');
+  toast('Details submitted. Opening Certificate Generator…');
+  setTimeout(()=>{ window.location.href='https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/'; },900);
 }catch(err){
   // Keep the record locally so the user's entry is not lost.
   if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}else data.unshift(record);
