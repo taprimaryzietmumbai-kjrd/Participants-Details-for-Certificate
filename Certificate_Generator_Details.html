@@ -100,28 +100,105 @@ function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
 function formData(){const o={};fields.forEach(k=>{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim()});return o}
 function clearForm(){ $('entryForm').reset();$('formTitle').textContent='प्रतिभागी का विवरण जोड़ें / Add participant details';$('saveBtn').textContent='＋ विवरण सहेजें / Save record';editingId=null}
-$('entryForm').addEventListener('submit',async e=>{
-e.preventDefault();
-const o=formData();
-if(!o.salutation.length||!o.fullNameHi||!o.fullNameEn||!o.recordType||!o.workshopTitleHi||!o.workshopTitleEn||!o.startDate||!o.endDate||!o.designationHi||!o.designationEn||!o.schoolHi||!o.schoolEn||!o.regionHi||!o.regionEn||!o.gender||!o.category.length||o.cpd===''||!o.certDate||!o.attendance||!o.notesHi||!o.notesEn){toast('कृपया सभी फ़ील्ड भरें; कोई भी फ़ील्ड वैकल्पिक नहीं है / Please complete every field; no field is optional.');return}
-if(o.endDate<o.startDate){toast('समाप्ति तिथि प्रारंभ तिथि से पहले नहीं हो सकती / End date cannot be earlier than start date.');return}
-const existing=editingId?data.find(x=>x.id===editingId):null;
-const record={...(existing||{}),id:existing?.id||(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),createdAt:existing?.createdAt||new Date().toISOString(),...o};
-const btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving… / सहेजा जा रहा है';
-try{
-  // Send the request, but do not pretend the opaque no-cors response confirms success.
-  await fetch(SHEETS_WEB_APP_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'save',record})});
-  if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}
-  else data.unshift(record);
-  persist();
-  toast('Request sent. Server save/PDF status is not verifiable from this page; check the sheet before proceeding.');
-  // Keep the form and stay on this page. Do not redirect or clear the entry on an unverified response.
-}catch(err){
-  // Keep the record locally so the user's entry is not lost.
-  if(editingId){const i=data.findIndex(x=>x.id===editingId);if(i>=0)data[i]=record;}else data.unshift(record);
-  persist();
-  toast('Saved in this browser, but Sheets connection could not be confirmed. Export a CSV backup and retry.');
-}finally{btn.disabled=false;btn.textContent=editingId?'परिवर्तन सहेजें / Save changes':'＋ विवरण सहेजें / Save record';}
+function postRecordAndWaitForResult(payload) {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement('iframe');
+    const frameName = 'appsScriptResponse_' + Date.now();
+    iframe.name = frameName;
+    iframe.style.display = 'none';
+    iframe.setAttribute('aria-hidden', 'true');
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = SHEETS_WEB_APP_URL;
+    form.target = frameName;
+    form.enctype = 'application/x-www-form-urlencoded';
+    form.style.display = 'none';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    let finished = false;
+    const cleanup = () => {
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timeout);
+      form.remove();
+      iframe.remove();
+    };
+    const onMessage = event => {
+      if (!event.data || event.data.type !== 'participant-save-result' || !event.data.payload) return;
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(event.data.payload);
+    };
+    const timeout = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(new Error('Timed out waiting for Apps Script. The server result could not be confirmed.'));
+    }, 60000);
+    window.addEventListener('message', onMessage);
+    form.submit();
+  });
+}
+
+$('entryForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const o = formData();
+  if (!o.salutation.length || !o.fullNameHi || !o.fullNameEn || !o.recordType ||
+      !o.workshopTitleHi || !o.workshopTitleEn || !o.startDate || !o.endDate ||
+      !o.designationHi || !o.designationEn || !o.schoolHi || !o.schoolEn ||
+      !o.regionHi || !o.regionEn || !o.gender || !o.category.length ||
+      o.cpd === '' || !o.certDate || !o.attendance || !o.notesHi || !o.notesEn) {
+    toast('कृपया सभी फ़ील्ड भरें / Please complete every required field.');
+    return;
+  }
+  if (o.endDate < o.startDate) {
+    toast('समाप्ति तिथि प्रारंभ तिथि से पहले नहीं हो सकती / End date cannot be earlier than start date.');
+    return;
+  }
+  const existing = editingId ? data.find(x => x.id === editingId) : null;
+  const record = {
+    ...(existing || {}),
+    id: existing?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    ...o
+  };
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving… / सहेजा जा रहा है';
+  try {
+    const result = await postRecordAndWaitForResult({action: 'save', record});
+    if (!result || result.ok !== true) {
+      throw new Error(result && (result.error || result.message)
+        ? (result.error || result.message)
+        : 'The server did not confirm the save.');
+    }
+    if (editingId) {
+      const i = data.findIndex(x => x.id === editingId);
+      if (i >= 0) data[i] = record;
+    } else {
+      data.unshift(record);
+    }
+    persist();
+    const status = result.pdfStatus || 'PDF status not returned';
+    toast('Google Sheets save confirmed. ' + status);
+    if (result.pdfStatus === 'PDF created' && result.pdfUrl) {
+      const openPdf = confirm('Record saved and PDF created. Open the PDF now?');
+      if (openPdf) window.open(result.pdfUrl, '_blank', 'noopener');
+    } else if (result.pdfStatus && result.pdfStatus.indexOf('PDF failed:') === 0) {
+      toast('Record saved to Google Sheets, but PDF generation failed: ' + result.pdfStatus.substring(12));
+    }
+  } catch (err) {
+    toast('Save not confirmed: ' + (err && err.message ? err.message : String(err)) +
+      '. Your entries remain in the form. No redirect occurred.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingId ? 'परिवर्तन सहेजें / Save changes' : '＋ विवरण सहेजें / Save record';
+  }
 });
 $('resetBtn').onclick=clearForm;
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
