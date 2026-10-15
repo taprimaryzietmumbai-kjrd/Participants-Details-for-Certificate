@@ -259,8 +259,7 @@ function responseOutput_(value) {
   const html = '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
     '<script>window.top.postMessage({type:"participant-save-result",payload:' +
     payloadJson + '}, "*");</script>Request processed.</body></html>';
-  return HtmlService.createHtmlOutput(html)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return HtmlService.createHtmlOutput(html);
 }
 
 function jsonOutput(value) {
