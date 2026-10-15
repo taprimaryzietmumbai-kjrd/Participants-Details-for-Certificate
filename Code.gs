@@ -11,6 +11,7 @@
 
 const SPREADSHEET_ID = '1UEoJeWsLZk0iJsXXXy4ey6yoHwCboRH4YD7mDL3mDBo';
 const SHEET_NAME = 'Participant Records';
+const PDF_FOLDER_ID = '1cNSHlQ3-ZkjYWm9mfwaV9-salfP5bM7w';
 
 const HEADERS = [
   'Record ID',
@@ -35,7 +36,9 @@ const HEADERS = [
   'Certificate Date',
   'TNA / Reflection / Feedback Status',
   'Remarks (Hindi)',
-  'Remarks (English)'
+  'Remarks (English)',
+  'PDF File URL',
+  'PDF Status'
 ];
 
 function doGet() {
@@ -99,7 +102,9 @@ function doPost(e) {
       record.certDate,
       record.attendance,
       record.notesHi,
-      record.notesEn
+      record.notesEn,
+      '',
+      ''
     ];
 
     // If the same ID is submitted again, update the existing row rather than duplicate it.
@@ -115,21 +120,91 @@ function doPost(e) {
     }
     if (targetRow > 0) {
       row[1] = sheet.getRange(targetRow, 2).getValue() || savedAt;
-      sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
     } else {
-      sheet.appendRow(row);
-      targetRow = sheet.getLastRow();
+      targetRow = sheet.getLastRow() + 1;
     }
+
+    // Create the PDF in the requested Drive folder. Keep the record in Sheets even if PDF creation fails.
+    let pdfUrl = '';
+    let pdfStatus = '';
+    try {
+      const pdfFile = createParticipantPdf_(record, recordId);
+      pdfUrl = pdfFile.getUrl();
+      pdfStatus = 'PDF created';
+    } catch (pdfErr) {
+      pdfStatus = 'PDF failed: ' + String(pdfErr && pdfErr.message ? pdfErr.message : pdfErr);
+    }
+    row[row.length - 2] = pdfUrl;
+    row[row.length - 1] = pdfStatus;
+    sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
 
     return jsonOutput({
       ok: true,
-      message: targetRow > 0 ? 'Record saved to Google Sheets.' : 'Record saved.',
+      message: 'Record saved to Google Sheets. ' + pdfStatus,
       recordId: recordId,
-      row: targetRow
+      row: targetRow,
+      pdfUrl: pdfUrl,
+      pdfStatus: pdfStatus
     });
   } catch (err) {
     return jsonOutput({ ok: false, error: String(err && err.message ? err.message : err) });
   }
+}
+
+
+function createParticipantPdf_(record, recordId) {
+  const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
+  const safeName = String(record.fullNameEn || record.fullNameHi || 'Participant')
+    .replace(/[\\\\/:*?"<>|#%{}~&]/g, '-').replace(/\\s+/g, ' ').trim();
+  const fileName = 'Certificate_Details_' + safeName + '_' + recordId + '.pdf';
+
+  // Replace a prior PDF for the same record ID so edits do not leave duplicate PDFs.
+  const existing = folder.getFilesByName(fileName);
+  while (existing.hasNext()) existing.next().setTrashed(true);
+
+  const labels = [
+    ['Record ID', recordId],
+    ['Salutation / संबोधन', joinValue(record.salutation)],
+    ['Full Name (Hindi) / पूरा नाम', record.fullNameHi],
+    ['Full Name (English)', record.fullNameEn],
+    ['Record Type / श्रेणी', record.recordType],
+    ['Workshop Title (Hindi) / कार्यशाला शीर्षक', record.workshopTitleHi],
+    ['Workshop Title (English)', record.workshopTitleEn],
+    ['Workshop Start Date / प्रारंभ तिथि', record.startDate],
+    ['Workshop End Date / समाप्ति तिथि', record.endDate],
+    ['Designation (Hindi) / पदनाम', record.designationHi],
+    ['Designation (English)', record.designationEn],
+    ['School / Institution (Hindi) / विद्यालय', record.schoolHi],
+    ['School / Institution (English)', record.schoolEn],
+    ['KVS Region (Hindi) / संभाग', record.regionHi],
+    ['KVS Region (English)', record.regionEn],
+    ['Gender', record.gender],
+    ['Category / श्रेणी', joinValue(record.category)],
+    ['CPD Hours', record.cpd],
+    ['Certificate Date / प्रमाण-पत्र तिथि', record.certDate],
+    ['TNA / Reflection / Feedback Status', record.attendance],
+    ['Remarks (Hindi) / टिप्पणी', record.notesHi],
+    ['Remarks (English)', record.notesEn]
+  ];
+  const rows = labels.map(function(pair) {
+    return '<tr><th>' + escapeHtml_(pair[0]) + '</th><td>' + escapeHtml_(pair[1]) + '</td></tr>';
+  }).join('');
+  const html = '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    'body{font-family:Arial,sans-serif;color:#202433;font-size:10pt;margin:28px}' +
+    'h1{color:#650909;font-size:19pt;margin-bottom:4px}p{color:#555;font-size:10pt}' +
+    'table{border-collapse:collapse;width:100%;margin-top:18px}th,td{border:1px solid #d8dbe5;padding:8px;text-align:left;vertical-align:top;word-break:break-word}' +
+    'th{width:36%;background:#f7eeee;color:#650909} .footer{margin-top:18px;font-size:8pt;color:#777}' +
+    '</style></head><body><h1>Kendriya Vidyalaya Sangathan — ZIET Mumbai</h1>' +
+    '<p>Participants Details for Certificate / प्रमाण-पत्र हेतु प्रतिभागी विवरण</p>' +
+    '<table>' + rows + '</table><div class="footer">Generated automatically from the submitted participant record.</div></body></html>';
+  const pdfBlob = HtmlService.createHtmlOutput(html).getBlob().getAs(MimeType.PDF).setName(fileName);
+  return folder.createFile(pdfBlob);
+}
+
+function escapeHtml_(value) {
+  return String(value == null ? '' : value).replace(/[&<>"]/g, function(ch) {
+    return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[ch];
+  });
 }
 
 function requiredFields() {
