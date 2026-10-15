@@ -124,7 +124,10 @@ function doPost(e) {
       targetRow = sheet.getLastRow() + 1;
     }
 
-    // Create the PDF in the requested Drive folder. Keep the record in Sheets even if PDF creation fails.
+    // Save the spreadsheet record FIRST. PDF generation must never prevent the record from being stored.
+    sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
+    SpreadsheetApp.flush();
+
     let pdfUrl = '';
     let pdfStatus = '';
     try {
@@ -134,9 +137,11 @@ function doPost(e) {
     } catch (pdfErr) {
       pdfStatus = 'PDF failed: ' + String(pdfErr && pdfErr.message ? pdfErr.message : pdfErr);
     }
-    row[row.length - 2] = pdfUrl;
-    row[row.length - 1] = pdfStatus;
-    sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
+
+    // Update PDF outcome independently after the record has been committed.
+    sheet.getRange(targetRow, HEADERS.indexOf('PDF File URL') + 1).setValue(pdfUrl);
+    sheet.getRange(targetRow, HEADERS.indexOf('PDF Status') + 1).setValue(pdfStatus);
+    SpreadsheetApp.flush();
 
     return jsonOutput({
       ok: true,
