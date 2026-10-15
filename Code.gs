@@ -51,12 +51,13 @@ function doGet() {
 
 function doPost(e) {
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const rawPayload = (e && e.parameter && e.parameter.payload) || (e && e.postData && e.postData.contents) || '{}';
+    const payload = JSON.parse(rawPayload);
     if (payload.action === 'ping') {
-      return jsonOutput({ ok: true, message: 'Connection successful.' });
+      return responseOutput_({ ok: true, message: 'Connection successful.' });
     }
     if (payload.action !== 'save') {
-      return jsonOutput({ ok: false, error: 'Unsupported action. Use action: save.' });
+      return responseOutput_({ ok: false, error: 'Unsupported action. Use action: save.' });
     }
 
     const record = payload.record || {};
@@ -66,10 +67,10 @@ function doPost(e) {
         (Array.isArray(value) ? value.length === 0 : String(value).trim() === '');
     });
     if (missing.length) {
-      return jsonOutput({ ok: false, error: 'Missing required fields.', fields: missing });
+      return responseOutput_({ ok: false, error: 'Missing required fields.', fields: missing });
     }
     if (String(record.endDate) < String(record.startDate)) {
-      return jsonOutput({ ok: false, error: 'End date cannot be earlier than start date.' });
+      return responseOutput_({ ok: false, error: 'End date cannot be earlier than start date.' });
     }
 
     const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -143,7 +144,7 @@ function doPost(e) {
     sheet.getRange(targetRow, HEADERS.indexOf('PDF Status') + 1).setValue(pdfStatus);
     SpreadsheetApp.flush();
 
-    return jsonOutput({
+    return responseOutput_({
       ok: true,
       message: 'Record saved to Google Sheets. ' + pdfStatus,
       recordId: recordId,
@@ -152,7 +153,7 @@ function doPost(e) {
       pdfStatus: pdfStatus
     });
   } catch (err) {
-    return jsonOutput({ ok: false, error: String(err && err.message ? err.message : err) });
+    return responseOutput_({ ok: false, error: String(err && err.message ? err.message : err) });
   }
 }
 
@@ -250,6 +251,15 @@ function ensureHeaders(sheet) {
 
 function joinValue(value) {
   return Array.isArray(value) ? value.join(', ') : String(value == null ? '' : value);
+}
+
+
+function responseOutput_(value) {
+  const payloadJson = JSON.stringify(value).replace(/</g, '\\u003c');
+  const html = '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+    '<script>window.parent.postMessage({type:"participant-save-result",payload:' +
+    payloadJson + '}, "*");</script>Request processed.</body></html>';
+  return HtmlService.createHtmlOutput(html);
 }
 
 function jsonOutput(value) {
