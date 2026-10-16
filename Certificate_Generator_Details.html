@@ -44,6 +44,10 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
 .field-pair{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;min-width:0}
 .field-pair>.field{min-width:0}
 @media(max-width:560px){.field-pair{grid-template-columns:1fr}}
+
+form>.aligned-row{grid-column:1/-1!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:13px!important;width:100%;min-width:0}
+form>.aligned-row>.field{min-width:0}
+@media(max-width:560px){form>.aligned-row{grid-template-columns:1fr!important}}
 </style>
 </head>
 <body>
@@ -88,9 +92,9 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
   </div>
 </div></div>
 <div class="field"><label for="participantWhatsapp">प्रतिभागी का WhatsApp नंबर / Participant WhatsApp No. *</label><input id="participantWhatsapp" type="tel" inputmode="tel" autocomplete="tel" pattern="[+0-9() -]{10,20}" required placeholder="+91 9876543210"><small class="hint">Include country code, e.g. +91.</small></div>
-<div class="field-pair">
-<div class="field"><label for="vidyalayaEmail">विद्यालय का ईमेल / Vidyalaya Email *</label><input id="vidyalayaEmail" type="email" required placeholder="school@example.kvs.gov.in"></div>
-<div class="field"><label for="participantEmail">प्रतिभागी का ईमेल / Participant Email *</label><input id="participantEmail" type="email" autocomplete="email" required placeholder="participant@example.com"></div>
+<div class="aligned-row email-row">
+  <div class="field"><label for="vidyalayaEmail">विद्यालय का ईमेल / Vidyalaya Email *</label><input id="vidyalayaEmail" type="email" required placeholder="school@example.kvs.gov.in"></div>
+  <div class="field"><label for="participantEmail">प्रतिभागी का ईमेल / Participant Email *</label><input id="participantEmail" type="email" autocomplete="email" required placeholder="participant@example.com"></div>
 </div>
 <div class="field"><label for="schoolEn">Vidyalaya / Institution — English *</label><input id="schoolEn" required placeholder="Full official name in English"></div>
 <div class="field"><label for="schoolHi">विद्यालय / संस्था — हिंदी *</label><input id="schoolHi" required placeholder="हिंदी में पूरा आधिकारिक नाम"></div>
