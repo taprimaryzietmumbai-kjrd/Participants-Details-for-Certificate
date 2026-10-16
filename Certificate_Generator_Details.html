@@ -300,7 +300,7 @@ function transliterateNameToHindi(text){
     naidu:'नायडू', rao:'राव', das:'दास', bose:'बोस',
     banerjee:'बनर्जी', chatterjee:'चटर्जी', mukherjee:'मुखर्जी'
   };
-  const words=String(text||'').trim().toLowerCase().split(/\\s+/).filter(Boolean);
+  const words=String(text||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
   if(!words.length || words.some(word=>!dictionary[word])) return '';
   return words.map(word=>dictionary[word]).join(' ');
 }
