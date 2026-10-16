@@ -40,7 +40,10 @@ const HEADERS = [
   'PDF File URL',
   'PDF Status',
   'Employee Code',
-  'Year of Joining'
+  'Year of Joining',
+  'Participant WhatsApp No.',
+  'Participant Email',
+  'Vidyalaya Email'
 ];
 
 function doGet() {
@@ -109,7 +112,10 @@ function doPost(e) {
       '',
       '',
       record.employeeCode,
-      record.yearOfJoining
+      record.yearOfJoining,
+      record.participantWhatsapp,
+      record.participantEmail,
+      record.vidyalayaEmail
     ];
 
     // If the same ID is submitted again, update the existing row rather than duplicate it.
@@ -186,6 +192,9 @@ function createParticipantPdf_(record, recordId) {
     ['Designation (English)', record.designationEn],
     ['Employee Code / कर्मचारी कोड', record.employeeCode],
     ['Year of Joining / कार्यग्रहण वर्ष', record.yearOfJoining],
+    ['Participant WhatsApp No. / प्रतिभागी WhatsApp नंबर', record.participantWhatsapp],
+    ['Participant Email / प्रतिभागी ईमेल', record.participantEmail],
+    ['Vidyalaya Email / विद्यालय ईमेल', record.vidyalayaEmail],
     ['School / Institution (Hindi) / विद्यालय', record.schoolHi],
     ['School / Institution (English)', record.schoolEn],
     ['KVS Region (Hindi) / संभाग', record.regionHi],
@@ -223,7 +232,7 @@ function requiredFields() {
   return [
     'salutation', 'fullNameHi', 'fullNameEn', 'recordType',
     'workshopTitleHi', 'workshopTitleEn', 'startDate', 'endDate',
-    'designationHi', 'designationEn', 'employeeCode', 'yearOfJoining', 'schoolHi', 'schoolEn',
+    'designationHi', 'designationEn', 'employeeCode', 'yearOfJoining', 'participantWhatsapp', 'participantEmail', 'vidyalayaEmail', 'schoolHi', 'schoolEn',
     'regionHi', 'regionEn', 'gender', 'category', 'cpd',
     'certDate', 'attendance', 'notesHi', 'notesEn'
   ];
