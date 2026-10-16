@@ -274,31 +274,43 @@ document.addEventListener('click',e=>{if(!e.target.closest('.year-picker-wrap'))
 
 /* Local-only English-to-Hindi name transliteration suggestion; no participant text is sent to a service. */
 function transliterateNameToHindi(text){
-  const source=String(text||'').trim().toLowerCase();
-  if(!source) return '';
-  const words=source.split(/\s+/);
-  const map={
-    'a':'अ','aa':'आ','i':'इ','ee':'ई','ii':'ई','u':'उ','oo':'ऊ','uu':'ऊ','e':'ए','ai':'ऐ','o':'ओ','au':'औ',
-    'k':'क','kh':'ख','g':'ग','gh':'घ','ng':'ङ','ch':'च','chh':'छ','j':'ज','jh':'झ','ny':'ञ',
-    't':'त','th':'थ','d':'द','dh':'ध','n':'न','ṭ':'ट','ṭh':'ठ','ḍ':'ड','ḍh':'ढ',
-    'p':'प','ph':'फ','f':'फ','b':'ब','bh':'भ','m':'म','y':'य','r':'र','l':'ल','v':'व','w':'व',
-    'sh':'श','ṣ':'ष','s':'स','h':'ह','z':'ज़','q':'क़','x':'क्स'
+  // Conservative local suggestions: use reviewed spellings for common names.
+  // If a word is unknown, do not invent a Devanagari spelling.
+  const dictionary = {
+    anand:'आनंद', ananda:'आनंद', kumar:'कुमार', srivastava:'श्रीवास्तव',
+    amit:'अमित', amita:'अमिता', anil:'अनिल', sunil:'सुनील', rahul:'राहुल',
+    rohit:'रोहित', rajesh:'राजेश', rakesh:'राकेश', mukesh:'मुकेश',
+    suresh:'सुरेश', mahesh:'महेश', dinesh:'दिनेश', manish:'मनीष',
+    pankaj:'पंकज', sanjay:'संजय', vijay:'विजय', ajay:'अजय',
+    deepak:'दीपक', pradip:'प्रदीप', pradeep:'प्रदीप', sachin:'सचिन',
+    vivek:'विवेक', vinod:'विनोद', arvind:'अरविंद', arun:'अरुण',
+    mohan:'मोहन', sohan:'सोहन', krishna:'कृष्ण', shankar:'शंकर',
+    shashank:'शशांक', shweta:'श्वेता', sweta:'श्वेता', neha:'नेहा',
+    pooja:'पूजा', puja:'पूजा', priya:'प्रिया', priyanka:'प्रियंका',
+    kavita:'कविता', sunita:'सुनीता', seema:'सीमा', rekha:'रेखा',
+    geeta:'गीता', gita:'गीता', anita:'अनीता', archana:'अर्चना',
+    mamta:'ममता', mamata:'ममता', sarita:'सरिता', savita:'सविता',
+    meena:'मीना', mina:'मीना', radha:'राधा', lakshmi:'लक्ष्मी',
+    laxmi:'लक्ष्मी', saraswati:'सरस्वती', devi:'देवी', singh:'सिंह',
+    sharma:'शर्मा', verma:'वर्मा', varma:'वर्मा', gupta:'गुप्ता',
+    mishra:'मिश्रा', mishraa:'मिश्रा', tripathi:'त्रिपाठी',
+    tiwari:'तिवारी', pandey:'पांडेय', pandeyy:'पांडेय',
+    yadav:'यादव', patel:'पटेल', shah:'शाह', desai:'देसाई',
+    joshi:'जोशी', mehta:'मेहता', jain:'जैन', reddy:'रेड्डी',
+    naidu:'नायडू', rao:'राव', das:'दास', bose:'बोस',
+    banerjee:'बनर्जी', chatterjee:'चटर्जी', mukherjee:'मुखर्जी'
   };
-  const keys=Object.keys(map).sort((a,b)=>b.length-a.length);
-  return words.map(word=>{
-    let out='',i=0;
-    while(i<word.length){
-      let found='';
-      for(const key of keys){if(word.startsWith(key,i)){found=key;break;}}
-      if(!found){out+=word[i];i++;continue;}
-      out+=map[found];i+=found.length;
-    }
-    return out;
-  }).join(' ');
+  const words=String(text||'').trim().toLowerCase().split(/\\s+/).filter(Boolean);
+  if(!words.length || words.some(word=>!dictionary[word])) return '';
+  return words.map(word=>dictionary[word]).join(' ');
 }
 $('fullNameEn').addEventListener('input',()=>{
  const hi=$('fullNameHi');
- if(!hi.dataset.userEdited || !hi.value.trim()) hi.value=transliterateNameToHindi($('fullNameEn').value);
+ if(!hi.dataset.userEdited || !hi.value.trim()){
+   const suggestion=transliterateNameToHindi($('fullNameEn').value);
+   if(suggestion) hi.value=suggestion;
+   else if(!hi.dataset.userEdited) hi.value='';
+ }
 });
 $('fullNameHi').addEventListener('input',()=>{$('fullNameHi').dataset.userEdited='true';});
 $('fullNameEn').addEventListener('input',()=>{if(!$('fullNameHi').value.trim())$('fullNameHi').dataset.userEdited='';});
