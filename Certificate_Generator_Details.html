@@ -27,6 +27,20 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
 .toast{position:fixed;bottom:18px;right:18px;background:#202433;color:white;border-radius:10px;padding:12px 16px;box-shadow:0 8px 28px #0002;display:none;max-width:90vw}
 @media(max-width:950px){.columns{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.stats{grid-template-columns:1fr}.stat{padding:12px 15px}.stat strong{font-size:23px}form{grid-template-columns:1fr}.field.full{grid-column:auto}.panel{padding:15px}}
 @media print{header,.stats,.entry-panel,.toolbar,.actions,.rowactions,.footnote{display:none!important}body{background:white}.wrap{margin:0;padding:0}.columns{display:block}.panel{border:0;box-shadow:none;padding:0}table{min-width:0}th,td{font-size:9pt;padding:7px}th{position:static}}
+
+.year-picker-wrap{position:relative}
+.year-picker-wrap input{padding-right:44px;cursor:pointer}
+.year-picker-toggle{position:absolute;right:5px;top:5px;width:34px;height:34px;padding:0;background:#f1e7e7;color:#650909;border-radius:7px;font-size:19px}
+.year-picker{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:min(300px,90vw);padding:12px;background:#fff;border:1px solid #d8dbe5;border-radius:12px;box-shadow:0 12px 32px #0002}
+.year-picker[hidden]{display:none}
+.year-picker-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.year-picker-head strong{font-size:13px;color:#650909}
+.year-picker-head button{padding:4px 10px;background:#f1e7e7;color:#650909;font-size:20px}
+.year-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.year-grid button{background:#f7f7fa;color:#202433;border:1px solid #e7e8ee;padding:9px 4px}
+.year-grid button.selected{background:#650909;color:#fff;border-color:#650909}
+.year-grid button:disabled{opacity:.35;cursor:not-allowed}
+
 </style>
 </head>
 <body>
@@ -58,7 +72,18 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
 <div class="field"><label for="designationHi">पदनाम — हिंदी *</label><input id="designationHi" required placeholder="हिंदी में पदनाम"></div>
 <div class="field"><label for="designationEn">Designation — English *</label><input id="designationEn" required placeholder="Designation in English"></div>
 <div class="field"><label for="employeeCode">कर्मचारी कोड / Employee Code *</label><input id="employeeCode" required placeholder="Enter employee code"></div>
-<div class="field"><label for="yearOfJoining">कार्यग्रहण वर्ष / Year of Joining *</label><input id="yearOfJoining" type="number" min="1950" max="2100" step="1" required placeholder="e.g. 2012"></div>
+<div class="field"><label for="yearOfJoining">कार्यग्रहण वर्ष / Year of Joining *</label><div class="year-picker-wrap">
+  <input id="yearOfJoining" type="text" required readonly placeholder="वर्ष चुनें / Select year" aria-haspopup="dialog" aria-expanded="false">
+  <button type="button" class="year-picker-toggle" id="yearPickerToggle" aria-label="Select joining year">▦</button>
+  <div class="year-picker" id="yearPicker" role="dialog" aria-label="Year of joining picker" hidden>
+    <div class="year-picker-head">
+      <button type="button" id="yearPrev" aria-label="Previous years">‹</button>
+      <strong id="yearRange"></strong>
+      <button type="button" id="yearNext" aria-label="Next years">›</button>
+    </div>
+    <div class="year-grid" id="yearGrid"></div>
+  </div>
+</div></div>
 <div class="field"><label for="participantWhatsapp">प्रतिभागी का WhatsApp नंबर / Participant WhatsApp No. *</label><input id="participantWhatsapp" type="tel" inputmode="tel" autocomplete="tel" pattern="[+0-9() -]{10,20}" required placeholder="+91 9876543210"><small class="hint">Include country code, e.g. +91.</small></div>
 <div class="field"><label for="participantEmail">प्रतिभागी का ईमेल / Participant Email *</label><input id="participantEmail" type="email" autocomplete="email" required placeholder="participant@example.com"></div>
 <div class="field"><label for="vidyalayaEmail">विद्यालय का ईमेल / Vidyalaya Email *</label><input id="vidyalayaEmail" type="email" required placeholder="school@example.kvs.gov.in"></div>
@@ -209,6 +234,34 @@ function render(){
   $('participants').textContent=data.filter(x=>x.recordType==='Participant').length;
   $('resources').textContent=data.filter(x=>x.recordType==='Resource Person').length;
 }
+
+const yearPicker=$('yearPicker'),yearInput=$('yearOfJoining'),yearGrid=$('yearGrid');
+let yearPage=Math.floor((new Date().getFullYear()-1950)/12)*12+1950;
+function renderYearPicker(){
+  const start=yearPage,end=Math.min(yearPage+11,new Date().getFullYear());
+  $('yearRange').textContent=start+' – '+end;
+  $('yearPrev').disabled=start<=1950;
+  $('yearNext').disabled=end>=new Date().getFullYear();
+  yearGrid.innerHTML='';
+  for(let y=start;y<=end;y++){
+    const b=document.createElement('button');b.type='button';b.textContent=String(y);
+    if(String(y)===String(yearInput.value))b.classList.add('selected');
+    b.onclick=()=>{yearInput.value=String(y);yearInput.dispatchEvent(new Event('change',{bubbles:true}));closeYearPicker();};
+    yearGrid.appendChild(b);
+  }
+}
+function openYearPicker(){
+  const selected=Number(yearInput.value);
+  if(selected>=1950&&selected<=new Date().getFullYear())yearPage=Math.floor((selected-1950)/12)*12+1950;
+  yearPicker.hidden=false;yearInput.setAttribute('aria-expanded','true');renderYearPicker();
+}
+function closeYearPicker(){yearPicker.hidden=true;yearInput.setAttribute('aria-expanded','false');}
+$('yearPickerToggle').addEventListener('click',()=>yearPicker.hidden?openYearPicker():closeYearPicker());
+yearInput.addEventListener('click',openYearPicker);
+$('yearPrev').addEventListener('click',()=>{yearPage=Math.max(1950,yearPage-12);renderYearPicker();});
+$('yearNext').addEventListener('click',()=>{yearPage=Math.min(Math.floor((new Date().getFullYear()-1950)/12)*12+1950,yearPage+12);renderYearPicker();});
+document.addEventListener('click',e=>{if(!e.target.closest('.year-picker-wrap'))closeYearPicker();});
+
 load();
 </script>
 </body></html>
