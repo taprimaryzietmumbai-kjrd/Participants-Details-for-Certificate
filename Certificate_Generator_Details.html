@@ -58,6 +58,9 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
         <div class="field"><label for="designationEn">Designation — English *</label><input id="designationEn" required placeholder="Designation in English"></div>
         <div class="field"><label for="employeeCode">कर्मचारी कोड / Employee Code *</label><input id="employeeCode" required placeholder="Enter employee code"></div>
         <div class="field"><label for="yearOfJoining">कार्यग्रहण वर्ष / Year of Joining *</label><input id="yearOfJoining" type="number" min="1950" max="2100" step="1" required placeholder="e.g. 2012"></div>
+        <div class="field"><label for="participantWhatsapp">प्रतिभागी का WhatsApp नंबर / Participant WhatsApp No. *</label><input id="participantWhatsapp" type="tel" inputmode="tel" autocomplete="tel" pattern="[+0-9() -]{10,20}" required placeholder="+91 9876543210"><small class="hint">Include country code, e.g. +91.</small></div>
+        <div class="field"><label for="participantEmail">प्रतिभागी का ईमेल / Participant Email *</label><input id="participantEmail" type="email" autocomplete="email" required placeholder="participant@example.com"></div>
+        <div class="field"><label for="vidyalayaEmail">विद्यालय का ईमेल / Vidyalaya Email *</label><input id="vidyalayaEmail" type="email" required placeholder="school@example.kvs.gov.in"></div>
         <div class="field"><label for="schoolHi">विद्यालय / संस्था — हिंदी *</label><input id="schoolHi" required placeholder="हिंदी में पूरा आधिकारिक नाम"></div>
         <div class="field"><label for="schoolEn">Vidyalaya / Institution — English *</label><input id="schoolEn" required placeholder="Full official name in English"></div>
         <div class="field"><label for="regionHi">के.वि.सं. संभाग — हिंदी *</label><input id="regionHi" required placeholder="हिंदी में संभाग का नाम"></div>
@@ -94,7 +97,8 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
 <script>
 const STORAGE_KEY='ziet-participants-details-certificate-register-v1';
 const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwzUPBSLEJjofDGkUmH_-AyXVu8SyAmye2oG_HUQhwugA8yycHOJ5_Jl7sNhLcfXYXcMA/exec';
-const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
+const CERTIFICATE_GENERATOR_URL='https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/';
+const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','participantWhatsapp','participantEmail','vidyalayaEmail','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 let data=[],editingId=null;
 const $=id=>document.getElementById(id);
 function load(){try{data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){data=[]}render()}
@@ -152,7 +156,7 @@ $('entryForm').addEventListener('submit', async e => {
   const o = formData();
   if (!o.salutation.length || !o.fullNameHi || !o.fullNameEn || !o.recordType ||
       !o.workshopTitleHi || !o.workshopTitleEn || !o.startDate || !o.endDate ||
-      !o.designationHi || !o.designationEn || !o.employeeCode || !o.yearOfJoining || !o.schoolHi || !o.schoolEn ||
+      !o.designationHi || !o.designationEn || !o.employeeCode || !o.yearOfJoining || !o.participantWhatsapp || !o.participantEmail || !o.vidyalayaEmail || !o.schoolHi || !o.schoolEn ||
       !o.regionHi || !o.regionEn || !o.gender || !o.category.length ||
       o.cpd === '' || !o.certDate || !o.attendance || !o.notesHi || !o.notesEn) {
     toast('कृपया सभी फ़ील्ड भरें / Please complete every required field.');
@@ -169,6 +173,8 @@ $('entryForm').addEventListener('submit', async e => {
     createdAt: existing?.createdAt || new Date().toISOString(),
     ...o
   };
+  // Reserve a tab during the click gesture so the generator can open after the save is confirmed.
+  const generatorTab = window.open('about:blank', '_blank');
   const btn = $('saveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving… / सहेजा जा रहा है';
@@ -189,12 +195,17 @@ $('entryForm').addEventListener('submit', async e => {
     const status = result.pdfStatus || 'PDF status not returned';
     toast('Google Sheets save confirmed. ' + status);
     if (result.pdfStatus === 'PDF created' && result.pdfUrl) {
-      const openPdf = confirm('Record saved and PDF created. Open the PDF now?');
+      if (generatorTab) {
+        const params = new URLSearchParams({participantName: record.fullNameEn, participantEmail: record.participantEmail, whatsapp: record.participantWhatsapp, vidyalayaEmail: record.vidyalayaEmail, employeeCode: record.employeeCode, yearOfJoining: record.yearOfJoining, workshopTitle: record.workshopTitleEn, recordId: record.id});
+        generatorTab.location.href = CERTIFICATE_GENERATOR_URL + '?' + params.toString();
+      }
+      const openPdf = confirm('Record saved and details PDF created. The Certificate Generator has been opened in a new tab. Open the details PDF too?');
       if (openPdf) window.open(result.pdfUrl, '_blank', 'noopener');
     } else if (result.pdfStatus && result.pdfStatus.indexOf('PDF failed:') === 0) {
       toast('Record saved to Google Sheets, but PDF generation failed: ' + result.pdfStatus.substring(12));
     }
   } catch (err) {
+    if (generatorTab && !generatorTab.closed) generatorTab.close();
     toast('Save not confirmed: ' + (err && err.message ? err.message : String(err)) +
       '. Your entries remain in the form. No redirect occurred.');
   } finally {
@@ -212,7 +223,7 @@ $('empty').style.display=rows.length?'none':'block'}
 window.editRecord=id=>{const x=data.find(y=>y.id===id);if(!x)return;fields.forEach(k=>{if(['category','salutation'].includes(k)){const vals=Array.isArray(x[k])?x[k]:(x[k]?[x[k]]:[]);Array.from($(k).options).forEach(opt=>opt.selected=vals.includes(opt.value));}else $(k).value=x[k]??''});editingId=id;$('formTitle').textContent='प्रतिभागी का विवरण संपादित करें / Edit participant record';$('saveBtn').textContent='परिवर्तन सहेजें / Save changes';window.scrollTo({top:0,behavior:'smooth'})};
 window.deleteRecord=id=>{const x=data.find(y=>y.id===id);if(!x)return;if(confirm(`Delete the record for ${(Array.isArray(x.salutation)?x.salutation.join(' '):'')+' '+(x.fullNameEn||x.fullNameHi)}? This cannot be undone.`)){data=data.filter(y=>y.id!==id);persist();if(editingId===id)clearForm();toast('रिकॉर्ड हटाया गया / Record deleted.')}};
 $('search').addEventListener('input',render);$('typeFilter').addEventListener('change',render);$('printBtn').onclick=()=>window.print();
-const csvFields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
+const csvFields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','participantWhatsapp','participantEmail','vidyalayaEmail','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 function csvCell(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
 $('exportCsv').onclick=()=>{const blob=new Blob([currentRegisterCSV()],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ZIET_Mumbai_Certificate_Generator_Details.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV रजिस्टर निर्यात हुआ / CSV register exported.')};
 function parseCSV(text){const out=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c==='"'&&text[i+1]==='"'){cell+='"';i++}else if(c==='"')quoted=false;else cell+=c}else if(c==='"')quoted=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'){row.push(cell.replace(/\r$/,''));out.push(row);row=[];cell=''}else cell+=c}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));out.push(row)}return out}
