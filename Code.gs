@@ -43,7 +43,8 @@ const HEADERS = [
   'Year of Joining',
   'Participant WhatsApp No.',
   'Participant Email',
-  'Vidyalaya Email'
+  'Vidyalaya Email',
+  'Certificate Receipt Status'
 ];
 
 function doGet() {
@@ -58,6 +59,9 @@ function doPost(e) {
   try {
     const rawPayload = (e && e.parameter && e.parameter.payload) || (e && e.postData && e.postData.contents) || '{}';
     const payload = JSON.parse(rawPayload);
+    if (payload.action === 'receiptAcknowledged') {
+      return responseOutput_(recordCertificateReceipt_(payload));
+    }
     if (payload.action === 'ping') {
       return responseOutput_({ ok: true, message: 'Connection successful.' });
     }
@@ -115,7 +119,8 @@ function doPost(e) {
       record.yearOfJoining,
       record.participantWhatsapp,
       record.participantEmail,
-      record.vidyalayaEmail
+      record.vidyalayaEmail,
+      ''
     ];
 
     // If the same ID is submitted again, update the existing row rather than duplicate it.
@@ -139,6 +144,11 @@ function doPost(e) {
     sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
     SpreadsheetApp.flush();
 
+    // Synchronize the submitted employee code into the certificate master sheet.
+    let masterSync = { ok: false, message: 'Not synchronized' };
+    try { masterSync = syncEmployeeCodeToMaster_(record); }
+    catch (syncErr) { masterSync = { ok: false, message: String(syncErr && syncErr.message ? syncErr.message : syncErr) }; }
+
     let pdfUrl = '';
     let pdfStatus = '';
     try {
@@ -160,13 +170,101 @@ function doPost(e) {
       recordId: recordId,
       row: targetRow,
       pdfUrl: pdfUrl,
-      pdfStatus: pdfStatus
+      pdfStatus: pdfStatus,
+      masterSync: masterSync
     });
   } catch (err) {
     return responseOutput_({ ok: false, error: String(err && err.message ? err.message : err) });
   }
 }
 
+
+
+/**
+ * Match the certificate master row by participant name + school + workshop title,
+ * then populate its employee-code field. Never creates or guesses a participant row.
+ */
+function syncEmployeeCodeToMaster_(record) {
+  const MASTER_SPREADSHEET_ID = '1Uuqoz2KFpTcw9d2HI02fLmFPopTaLnKWwZ9aR-uYCeY';
+  const ss = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
+  const employeeCode = String(record.employeeCode || '').trim();
+  if (!employeeCode) throw new Error('Employee Code is blank in the submitted record.');
+
+  const sheets = ss.getSheets();
+  const nameKeys = ['Name of the Participant', 'Full Name (English)', 'Name', 'Participant Name'];
+  const schoolKeys = ['School', 'School / Institution (English)', 'Vidyalaya'];
+  const titleKeys = ['Title', 'Workshop Title (English)', 'Workshop Title', 'Course Title'];
+  const codeKeys = ['Code', 'Employee Code', 'Employee Code / कर्मचारी कोड'];
+  const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\\s+/g, ' ');
+  let matches = [];
+
+  sheets.forEach(sheet => {
+    const values = sheet.getDataRange().getDisplayValues();
+    if (values.length < 2) return;
+    const headers = values[0].map(h => String(h || '').trim());
+    const findCol = keys => {
+      for (const key of keys) {
+        const i = headers.findIndex(h => norm(h) === norm(key));
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+    const nameCol = findCol(nameKeys), schoolCol = findCol(schoolKeys), titleCol = findCol(titleKeys), codeCol = findCol(codeKeys);
+    if (nameCol < 0 || codeCol < 0) return;
+    for (let r = 1; r < values.length; r++) {
+      const nameOk = norm(values[r][nameCol]) === norm(record.fullNameEn);
+      const schoolOk = schoolCol < 0 || norm(values[r][schoolCol]) === norm(record.schoolHi) || norm(values[r][schoolCol]) === norm(record.schoolEn);
+      const titleOk = titleCol < 0 || norm(values[r][titleCol]) === norm(record.workshopTitleEn);
+      if (nameOk && schoolOk && titleOk) matches.push({ sheet, row: r + 1, codeCol });
+    }
+  });
+  if (matches.length !== 1) {
+    throw new Error(matches.length ? 'More than one certificate row matched; employee code was not written.' : 'No unique participant row matched in the certificate master sheet.');
+  }
+  const m = matches[0];
+  m.sheet.getRange(m.row, m.codeCol + 1).setNumberFormat('@').setValue(employeeCode);
+  SpreadsheetApp.flush();
+  if (String(m.sheet.getRange(m.row, m.codeCol + 1).getDisplayValue()).trim() !== employeeCode) {
+    throw new Error('Employee code write-back could not be verified.');
+  }
+  return { ok: true, sheet: m.sheet.getName(), row: m.row };
+}
+
+/**
+ * Called by the certificate generator only after signature/date are saved.
+ * Marks the responder row and returns success only if the status is verified.
+ */
+function recordCertificateReceipt_(payload) {
+  const recordId = String(payload.recordId || '').trim();
+  const employeeCode = String(payload.employeeCode || '').trim();
+  const name = String(payload.participantName || '').trim();
+  if (!recordId && !employeeCode && !name) throw new Error('A participant identifier is required.');
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error('Responder sheet not found.');
+  ensureHeaders(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const col = headers.indexOf('Certificate Receipt Status') + 1;
+  const idCol = headers.indexOf('Record ID') + 1;
+  const codeCol = headers.indexOf('Employee Code') + 1;
+  const nameCol = headers.indexOf('Full Name (English)') + 1;
+  const titleCol = headers.indexOf('Workshop Title (English)') + 1;
+  const title = String(payload.workshopTitle || '').trim();
+  const data = sheet.getDataRange().getDisplayValues();
+  const matches = [];
+  for (let r = 1; r < data.length; r++) {
+    const idOk = recordId && String(data[r][idCol - 1]).trim() === recordId;
+    const codeOk = employeeCode && String(data[r][codeCol - 1]).trim() === employeeCode;
+    const nameOk = name && String(data[r][nameCol - 1]).trim().toLowerCase() === name.toLowerCase();
+    const titleOk = !title || String(data[r][titleCol - 1]).trim().toLowerCase() === title.toLowerCase();
+    if ((idOk || (!recordId && codeOk) || (!recordId && !employeeCode && nameOk)) && titleOk) matches.push(r + 1);
+  }
+  if (matches.length !== 1) throw new Error(matches.length ? 'Multiple responder rows match; status not changed.' : 'No unique responder row matched; status not changed.');
+  sheet.getRange(matches[0], col).setValue('Certificate received successfully');
+  SpreadsheetApp.flush();
+  if (sheet.getRange(matches[0], col).getDisplayValue() !== 'Certificate received successfully') throw new Error('Responder status could not be verified.');
+  return { ok: true, message: 'Certificate receipt status saved in responder sheet.', row: matches[0] };
+}
 
 function createParticipantPdf_(record, recordId) {
   const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
