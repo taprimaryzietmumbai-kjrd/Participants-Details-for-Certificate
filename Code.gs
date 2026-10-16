@@ -38,7 +38,9 @@ const HEADERS = [
   'Remarks (Hindi)',
   'Remarks (English)',
   'PDF File URL',
-  'PDF Status'
+  'PDF Status',
+  'Employee Code',
+  'Year of Joining'
 ];
 
 function doGet() {
@@ -105,7 +107,9 @@ function doPost(e) {
       record.notesHi,
       record.notesEn,
       '',
-      ''
+      '',
+      record.employeeCode,
+      record.yearOfJoining
     ];
 
     // If the same ID is submitted again, update the existing row rather than duplicate it.
@@ -180,6 +184,8 @@ function createParticipantPdf_(record, recordId) {
     ['Workshop End Date / समाप्ति तिथि', record.endDate],
     ['Designation (Hindi) / पदनाम', record.designationHi],
     ['Designation (English)', record.designationEn],
+    ['Employee Code / कर्मचारी कोड', record.employeeCode],
+    ['Year of Joining / कार्यग्रहण वर्ष', record.yearOfJoining],
     ['School / Institution (Hindi) / विद्यालय', record.schoolHi],
     ['School / Institution (English)', record.schoolEn],
     ['KVS Region (Hindi) / संभाग', record.regionHi],
@@ -217,7 +223,7 @@ function requiredFields() {
   return [
     'salutation', 'fullNameHi', 'fullNameEn', 'recordType',
     'workshopTitleHi', 'workshopTitleEn', 'startDate', 'endDate',
-    'designationHi', 'designationEn', 'schoolHi', 'schoolEn',
+    'designationHi', 'designationEn', 'employeeCode', 'yearOfJoining', 'schoolHi', 'schoolEn',
     'regionHi', 'regionEn', 'gender', 'category', 'cpd',
     'certDate', 'attendance', 'notesHi', 'notesEn'
   ];
