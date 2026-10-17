@@ -253,7 +253,8 @@ function postRecordAndWaitForResult(payload) {
 $('entryForm').addEventListener('submit', async e => {
   e.preventDefault();
   const o = formData();
-  if (!participantPhotoDataUrl || !signatureHasInk) { toast('Please take the participant photo and capture the signature before saving.'); return; }\n  if (!o.salutation.length || !o.fullNameHi || !o.fullNameEn || !o.recordType ||
+  if (!participantPhotoDataUrl || !signatureHasInk) { toast('Please take the participant photo and capture the signature before saving.'); return; }
+  if (!o.salutation.length || !o.fullNameHi || !o.fullNameEn || !o.recordType ||
       !o.workshopTitleHi || !o.workshopTitleEn || !o.startDate || !o.endDate ||
       !o.designationHi || !o.designationEn || !o.employeeCode || !o.yearOfJoining || !o.participantWhatsapp || !o.participantEmail || !o.vidyalayaEmail || !o.schoolHi || !o.schoolEn ||
       !o.regionHi || !o.regionEn || !o.gender || !o.category.length ||
@@ -270,10 +271,13 @@ $('entryForm').addEventListener('submit', async e => {
     ...(existing || {}),
     id: existing?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
     createdAt: existing?.createdAt || new Date().toISOString(),
-    ...o
+    ...o,
+    participantPhotoDataUrl,
+    signatureDataUrl: sigCanvas.toDataURL('image/png')
   };
   // Reserve a tab during the click gesture so the generator can open after the save is confirmed.
-  const generatorTab = window.open('about:blank', '_blank');\n  const pdfTab = window.open('about:blank', '_blank');
+  const generatorTab = window.open('about:blank', '_blank');
+  const pdfTab = window.open('about:blank', '_blank');
   const btn = $('saveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving… / सहेजा जा रहा है';
@@ -293,18 +297,21 @@ $('entryForm').addEventListener('submit', async e => {
     persist();
     const status = result.pdfStatus || 'PDF status not returned';
     toast('Google Sheets save confirmed. ' + status);
-    if (result.pdfStatus === 'PDF created' && result.pdfUrl) {\n      if (pdfTab) pdfTab.location.href = result.pdfUrl; else toast('PDF created in Drive. Allow pop-ups to open it automatically.');
+    if (result.pdfStatus === 'PDF created' && result.pdfUrl) {
+      if (pdfTab) pdfTab.location.href = result.pdfUrl; else toast('PDF created in Drive. Allow pop-ups to open it automatically.');
       if (generatorTab) {
         const params = new URLSearchParams({participantName: record.fullNameEn, participantEmail: record.participantEmail, whatsapp: record.participantWhatsapp, vidyalayaEmail: record.vidyalayaEmail, employeeCode: record.employeeCode, yearOfJoining: record.yearOfJoining, workshopTitle: record.workshopTitleEn, recordId: record.id});
         generatorTab.location.href = CERTIFICATE_GENERATOR_URL + '?' + params.toString();
       }
-      const openPdf = confirm('Record saved and details PDF created. The Certificate Generator has been opened in a new tab. Open the details PDF too?');
-      if (openPdf) window.open(result.pdfUrl, '_blank', 'noopener');
+      const thanks = 'Thank you, ' + record.fullNameEn + ', for submitting your participant details. Your details have been recorded. Please generate your CPD certificate using this link: ' + CERTIFICATE_GENERATOR_URL;
+      const waNumber = String(record.participantWhatsapp || '').replace(/[^0-9]/g, '');
+      if (waNumber) window.open('https://wa.me/' + waNumber + '?text=' + encodeURIComponent(thanks), '_blank', 'noopener');
     } else if (result.pdfStatus && result.pdfStatus.indexOf('PDF failed:') === 0) {
       toast('Record saved to Google Sheets, but PDF generation failed: ' + result.pdfStatus.substring(12));
     }
   } catch (err) {
-    if (generatorTab && !generatorTab.closed) generatorTab.close();\n    if (typeof pdfTab !== 'undefined' && pdfTab && !pdfTab.closed) pdfTab.close();
+    if (generatorTab && !generatorTab.closed) generatorTab.close();
+    if (typeof pdfTab !== 'undefined' && pdfTab && !pdfTab.closed) pdfTab.close();
     toast('Save not confirmed: ' + (err && err.message ? err.message : String(err)) +
       '. Your entries remain in the form. No redirect occurred.');
   } finally {
@@ -349,6 +356,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.year-picker-wrap'))
 
 
 
-sizeSignatureCanvas();\nload();
+sizeSignatureCanvas();
+load();
 </script>
 </body></html>
