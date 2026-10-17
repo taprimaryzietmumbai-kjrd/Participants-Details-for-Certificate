@@ -141,21 +141,16 @@ function fillParticipantDetails(person){
   if(!person) return;
   const set=(id,value)=>{if(value!==undefined&&value!==null&&String(value).trim()!=='') $(id).value=String(value).trim();};
   set('fullNameHi',person.hindiName||person.fullNameHi);
-  const designation=String(person.designation||person.post||person.designationEn||'').trim();
-  if(designation){
-    const select=$('designationEn');
-    const option=Array.from(select.options).find(o=>cleanDesignation(o.value||o.textContent)===cleanDesignation(designation));
-    if(option) select.value=option.value;
-    else select.value='';
-    select.dispatchEvent(new Event('change',{bubbles:true}));
-  }
-  set('designationHi',person.designationHi||person.hindiDesignation);
+  // Designation is intentionally selected manually from the complete dropdown.
+  // Do not infer or auto-fill a designation from the participant's name or lookup record.
+  $('designationEn').value='';
+  $('designationHi').value='';
+  $('designationLookupStatus').textContent='Please select the designation manually from the complete list.';
+
   set('schoolEn',person.school||person.vidyalaya||person.schoolEn);
   set('regionEn',person.region||person.regionEn);
   const status=$('participantLookupStatus');
   if(status) status.textContent='Participant details loaded from the live participant list.';
-  const designationStatus=$('designationLookupStatus');
-  if(designationStatus) designationStatus.textContent=designation ? (Array.from($('designationEn').options).some(o=>cleanDesignation(o.value||o.textContent)===cleanDesignation(designation))?'Designation selected automatically.':'Designation not in the list; please select it manually.') : 'No designation is available for this participant.';
 }
 function loadParticipantDesignationLookup(){
   const select=$('fullNameEn');
