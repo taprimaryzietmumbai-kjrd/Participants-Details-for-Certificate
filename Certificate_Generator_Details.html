@@ -307,9 +307,7 @@ $('entryForm').addEventListener('submit', async e => {
     participantPhotoDataUrl,
     signatureDataUrl: sigCanvas.toDataURL('image/png')
   };
-  // Reserve a tab during the click gesture so the generator can open after the save is confirmed.
-  const generatorTab = window.open('about:blank', '_blank');
-  const pdfTab = window.open('about:blank', '_blank');
+  // Do not open temporary tabs during submission; show the result on this page.
   const btn = $('saveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving… / सहेजा जा रहा है';
@@ -331,11 +329,7 @@ $('entryForm').addEventListener('submit', async e => {
     $('submissionSuccess').hidden = false;
     $('submissionSuccess').scrollIntoView({behavior:'smooth',block:'center'});
     toast('Submission successful. Open the CPD Certificate Generator link shown on the page.');
-    if (generatorTab && !generatorTab.closed) generatorTab.close();
-    if (pdfTab && !pdfTab.closed) pdfTab.close();
   } catch (err) {
-    if (generatorTab && !generatorTab.closed) generatorTab.close();
-    if (typeof pdfTab !== 'undefined' && pdfTab && !pdfTab.closed) pdfTab.close();
     toast('Save not confirmed: ' + (err && err.message ? err.message : String(err)) +
       '. Your entries remain in the form. No redirect occurred.');
   } finally {
