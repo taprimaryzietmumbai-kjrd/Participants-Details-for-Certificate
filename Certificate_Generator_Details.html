@@ -274,7 +274,7 @@ function postRecordAndWaitForResult(payload) {
       if (finished) return;
       finished = true;
       cleanup();
-      reject(new Error('Timed out waiting for Apps Script. The server result could not be confirmed.'));
+      reject(new Error('The server did not return a confirmation. Check the saved record before submitting again.'));
     }, 60000);
     window.addEventListener('message', onMessage);
     form.submit();
