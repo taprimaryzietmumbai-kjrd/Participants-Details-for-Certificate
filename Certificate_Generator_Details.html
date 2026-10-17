@@ -282,6 +282,10 @@ function postRecordAndWaitForResult(payload) {
   });
 }
 
+// Reuse the same ID after a timeout so retrying this form updates the existing
+// server row instead of creating a duplicate participant record.
+let pendingSubmissionId = null;
+
 $('entryForm').addEventListener('submit', async e => {
   e.preventDefault();
   const o = formData();
@@ -301,7 +305,7 @@ $('entryForm').addEventListener('submit', async e => {
   const existing = editingId ? data.find(x => x.id === editingId) : null;
   const record = {
     ...(existing || {}),
-    id: existing?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+    id: existing?.id || pendingSubmissionId || (pendingSubmissionId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random())),
     createdAt: existing?.createdAt || new Date().toISOString(),
     ...o,
     participantPhotoDataUrl,
@@ -318,6 +322,7 @@ $('entryForm').addEventListener('submit', async e => {
         ? (result.error || result.message)
         : 'The server did not confirm the save.');
     }
+    pendingSubmissionId = null;
     if (editingId) {
       const i = data.findIndex(x => x.id === editingId);
       if (i >= 0) data[i] = record;
