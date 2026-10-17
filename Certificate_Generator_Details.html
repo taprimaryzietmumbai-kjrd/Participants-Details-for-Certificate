@@ -69,7 +69,7 @@ form>.aligned-row>.field{min-width:0}
       <form id="entryForm">
 <div class="field full"><label for="salutation">संबोधन / Salutation * (एक या अधिक चुनें / Select one or more)</label><select id="salutation" multiple size="4" required aria-describedby="salutationHint"><option value="Shri">श्री / Shri</option><option value="Smt.">श्रीमती / Smt.</option><option value="Miss">सुश्री / Miss</option><option value="Dr.">डॉ. / Dr.</option></select><small class="hint" id="salutationHint">एक या अधिक संबोधन चुनें / Select one or more salutations.</small></div>
 <div class="field"><label for="fullNameEn">Participant name — type or speak *</label><input id="fullNameEn" type="text" required autocomplete="off" placeholder="Type or dictate the participant name"><small class="hint">Enter the name directly, or use your device’s microphone/voice typing. No participant suggestions are shown.</small></div>
-<div class="field"><label for="fullNameHi">पूरा नाम — हिंदी *</label><input id="fullNameHi" required placeholder="हिंदी में नाम"></div>
+<div class="field"><label for="fullNameHi">पूरा नाम — हिंदी *</label><input id="fullNameHi" required placeholder="अंग्रेज़ी नाम टाइप करें; हिंदी लिप्यंतरण यहाँ आएगा"><small class="hint" id="hindiNameStatus" aria-live="polite">English name टाइप करने पर हिंदी लिप्यंतरण अपने-आप आएगा; आप इसे संपादित भी कर सकते हैं।</small></div>
 <div class="field"><label for="recordType">प्रमाण-पत्र की श्रेणी / प्रमाण-पत्र category *</label><select id="recordType"><option value="">श्रेणी चुनें / Select category</option><option value="Participant">प्रतिभागी / Participant</option><option value="Resource Person">संसाधन व्यक्ति / Resource Person</option></select></div>
 <div class="field"><label for="gender">Gender</label><select id="gender" required><option value="">चुनें / Select</option><option>महिला / Female</option><option>पुरुष / Male</option><option>बताना नहीं चाहते / Prefer not to say</option></select></div>
 <div class="field"><label for="workshopTitleEn">Workshop title — English *</label><input id="workshopTitleEn" required placeholder="Exact title in English"></div>
@@ -124,6 +124,53 @@ const CERTIFICATE_GENERATOR_URL='https://taprimaryzietmumbai-kjrd.github.io/ZIET
 const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','participantWhatsapp','participantEmail','vidyalayaEmail','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 let data=[],editingId=null;
 const $=id=>document.getElementById(id);
+
+// Transliterate the English name into Devanagari using Google Input Tools.
+// Results are applied only while the Hindi field is empty or still auto-generated.
+let hindiNameTimer=null;
+let lastAutoHindiName='';
+let hindiNameRequest=0;
+$('fullNameEn').addEventListener('input',()=>{
+  clearTimeout(hindiNameTimer);
+  const englishName=$('fullNameEn').value.trim();
+  const hindiField=$('fullNameHi');
+  const status=$('hindiNameStatus');
+  if(!englishName){
+    if(hindiField.value===lastAutoHindiName) hindiField.value='';
+    lastAutoHindiName='';
+    if(status) status.textContent='English name टाइप करने पर हिंदी लिप्यंतरण अपने-आप आएगा; आप इसे संपादित भी कर सकते हैं।';
+    return;
+  }
+  if(hindiField.value && hindiField.value!==lastAutoHindiName){
+    if(status) status.textContent='हिंदी नाम में आपके बदलाव सुरक्षित हैं। स्वतः लिप्यंतरण के लिए हिंदी फ़ील्ड खाली करें।';
+    return;
+  }
+  hindiNameTimer=setTimeout(async()=>{
+    const requestId=++hindiNameRequest;
+    if(status) status.textContent='हिंदी लिप्यंतरण किया जा रहा है…';
+    try{
+      const url='https://inputtools.google.com/request?text='+encodeURIComponent(englishName)+'&itc=hi-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8';
+      const response=await fetch(url);
+      if(!response.ok) throw new Error('Transliteration service unavailable');
+      const result=await response.json();
+      if(requestId!==hindiNameRequest || $('fullNameEn').value.trim()!==englishName) return;
+      const hindi=result && result[0]==='SUCCESS' && result[1] && result[1][0] && result[1][0][1] && result[1][0][1][0];
+      if(!hindi) throw new Error('No transliteration returned');
+      if(!hindiField.value || hindiField.value===lastAutoHindiName){
+        hindiField.value=hindi;
+        lastAutoHindiName=hindi;
+        if(status) status.textContent='हिंदी लिप्यंतरण तैयार है। आवश्यकता हो तो इसे संपादित करें।';
+      }
+    }catch(error){
+      if(requestId===hindiNameRequest && status) status.textContent='स्वतः लिप्यंतरण उपलब्ध नहीं हो सका। हिंदी नाम यहाँ स्वयं टाइप करें।';
+    }
+  },450);
+});
+$('fullNameHi').addEventListener('input',()=>{
+  if($('fullNameHi').value!==lastAutoHindiName){
+    if($('hindiNameStatus')) $('hindiNameStatus').textContent='हिंदी नाम में आपके बदलाव सुरक्षित हैं।';
+  }
+});
 function load(){try{data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){data=[]}render()}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render()}
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
