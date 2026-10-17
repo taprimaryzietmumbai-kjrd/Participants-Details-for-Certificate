@@ -48,6 +48,9 @@ button,.filelabel{border:0;border-radius:9px;padding:10px 13px;font:700 13px inh
 form>.aligned-row{grid-column:1/-1!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:13px!important;width:100%;min-width:0}
 form>.aligned-row>.field{min-width:0}
 @media(max-width:560px){form>.aligned-row{grid-template-columns:1fr!important}}
+
+.photo-signature{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:4px 0 8px}.capture-card{border:1px solid #e7e8ee;border-radius:12px;padding:14px;background:#fff;min-width:0}.capture-card h3{margin:0 0 5px;font-size:14px;color:#650909}.capture-card p{margin:0 0 10px;color:#667085;font-size:12px}.photo-preview{width:150px;height:170px;object-fit:cover;border:1px dashed #b9bdca;border-radius:10px;background:#f7f7fa;display:block;margin:0 auto 10px}.signature-canvas{display:block;width:100%;height:170px;border:1px dashed #b9bdca;border-radius:10px;background:#fff;touch-action:none}.capture-buttons{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:9px}.capture-buttons button{font-size:12px}.capture-card input[type=file]{font-size:12px;padding:7px}.capture-note{font-size:11px;color:#667085;text-align:center;margin-top:7px}
+@media(max-width:650px){.photo-signature{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -67,6 +70,10 @@ form>.aligned-row>.field{min-width:0}
       <h2 id="formTitle">प्रतिभागी का विवरण जोड़ें / Add participant details</h2>
       <p class="sub">प्रमाण-पत्र में छपने वाला विवरण ठीक उसी रूप में दर्ज करें। कार्यशाला का शीर्षक और तिथियाँ प्रतिभागी से ही लें। * से चिह्नित फ़ील्ड अनिवार्य हैं। / Enter details exactly as they should appear on the certificate. Obtain the workshop title and dates from the participant. Fields marked * are required.</p>
       <form id="entryForm">
+<div class="photo-signature">
+ <section class="capture-card"><h3>Participant face photo / प्रतिभागी का फोटो *</h3><p>Tap the camera button to take a current face photo. Camera access depends on your device and browser.</p><img id="photoPreview" class="photo-preview" alt="Participant photo preview"><input id="participantPhoto" type="file" accept="image/*" capture="user" required aria-label="Take participant face photo"><div class="capture-note">Use the camera option; the image is included with the submission.</div></section>
+ <section class="capture-card"><h3>Participant signature / प्रतिभागी के हस्ताक्षर *</h3><p>Ask the participant to draw their signature below using a finger, stylus or mouse.</p><canvas id="signatureCanvas" class="signature-canvas" aria-label="Draw participant signature"></canvas><div class="capture-buttons"><button type="button" class="secondary" id="clearSignature">Clear signature / हस्ताक्षर मिटाएँ</button></div><div class="capture-note" id="signatureStatus" aria-live="polite">Signature required before saving.</div></section>
+</div>
 <div class="field full"><label for="salutation">संबोधन / Salutation * (एक या अधिक चुनें / Select one or more)</label><select id="salutation" multiple size="4" required aria-describedby="salutationHint"><option value="Shri">श्री / Shri</option><option value="Smt.">श्रीमती / Smt.</option><option value="Miss">सुश्री / Miss</option><option value="Dr.">डॉ. / Dr.</option></select><small class="hint" id="salutationHint">एक या अधिक संबोधन चुनें / Select one or more salutations.</small></div>
 <div class="field"><label for="fullNameEn">Participant name — type or speak *</label><input id="fullNameEn" type="text" required autocomplete="off" placeholder="Type or dictate the participant name"><small class="hint">Enter the name directly, or use your device’s microphone/voice typing. No participant suggestions are shown.</small></div>
 <div class="field"><label for="fullNameHi">पूरा नाम — हिंदी *</label><input id="fullNameHi" required placeholder="हिंदी नाम यहाँ आएगा"><small class="hint" id="hindiNameStatus" aria-live="polite" style="display:block;min-height:16px">अंग्रेज़ी नाम टाइप करें; हिंदी लिप्यंतरण अपने-आप होगा।</small></div>
@@ -180,6 +187,19 @@ $('fullNameHi').addEventListener('input',()=>{
     if($('hindiNameStatus')) $('hindiNameStatus').textContent='हिंदी नाम में आपके बदलाव सुरक्षित हैं।';
   }
 });
+// Photo capture and drawable signature. Images are sent with the save payload for the Apps Script to store.
+let participantPhotoDataUrl='';
+const photoInput=$('participantPhoto'),photoPreview=$('photoPreview');
+photoPreview.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="150" height="170"><rect width="100%" height="100%" fill="#f7f7fa"/><circle cx="75" cy="57" r="25" fill="#d8dbe5"/><path d="M25 150c3-35 23-50 50-50s47 15 50 50" fill="#d8dbe5"/></svg>');
+photoInput.addEventListener('change',()=>{const file=photoInput.files&&photoInput.files[0];if(!file){participantPhotoDataUrl='';return;}if(!file.type.startsWith('image/')){toast('Please choose an image from the camera.');photoInput.value='';return;}const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const max=700,scale=Math.min(1,max/Math.max(img.width,img.height));const canvas=document.createElement('canvas');canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);participantPhotoDataUrl=canvas.toDataURL('image/jpeg',0.82);photoPreview.src=participantPhotoDataUrl;};img.src=reader.result;};reader.readAsDataURL(file);});
+const sigCanvas=$('signatureCanvas'),sigCtx=sigCanvas.getContext('2d');let signatureHasInk=false,isSigning=false;
+function sizeSignatureCanvas(){const ratio=Math.max(window.devicePixelRatio||1,1),rect=sigCanvas.getBoundingClientRect();const old=signatureHasInk?sigCanvas.toDataURL():'';sigCanvas.width=Math.round(rect.width*ratio);sigCanvas.height=Math.round(rect.height*ratio);sigCtx.setTransform(ratio,0,0,ratio,0,0);sigCtx.lineWidth=2.2;sigCtx.lineCap='round';sigCtx.lineJoin='round';sigCtx.strokeStyle='#202433';signatureHasInk=false;if(old){const im=new Image();im.onload=()=>{sigCtx.drawImage(im,0,0,rect.width,rect.height);signatureHasInk=true;$('signatureStatus').textContent='Signature captured.';};im.src=old;}}
+function signaturePoint(e){const r=sigCanvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+sigCanvas.addEventListener('pointerdown',e=>{e.preventDefault();sigCanvas.setPointerCapture(e.pointerId);const p=signaturePoint(e);sigCtx.beginPath();sigCtx.moveTo(p.x,p.y);isSigning=true;});
+sigCanvas.addEventListener('pointermove',e=>{if(!isSigning)return;e.preventDefault();const p=signaturePoint(e);sigCtx.lineTo(p.x,p.y);sigCtx.stroke();signatureHasInk=true;$('signatureStatus').textContent='Signature captured.';});
+['pointerup','pointercancel','lostpointercapture'].forEach(ev=>sigCanvas.addEventListener(ev,()=>{isSigning=false;}));
+$('clearSignature').addEventListener('click',()=>{sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);signatureHasInk=false;$('signatureStatus').textContent='Signature required before saving.';});
+window.addEventListener('resize',()=>{if(!signatureHasInk)sizeSignatureCanvas();});
 function load(){try{data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){data=[]}render()}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render()}
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
@@ -233,7 +253,7 @@ function postRecordAndWaitForResult(payload) {
 $('entryForm').addEventListener('submit', async e => {
   e.preventDefault();
   const o = formData();
-  if (!o.salutation.length || !o.fullNameHi || !o.fullNameEn || !o.recordType ||
+  if (!participantPhotoDataUrl || !signatureHasInk) { toast('Please take the participant photo and capture the signature before saving.'); return; }\n  if (!o.salutation.length || !o.fullNameHi || !o.fullNameEn || !o.recordType ||
       !o.workshopTitleHi || !o.workshopTitleEn || !o.startDate || !o.endDate ||
       !o.designationHi || !o.designationEn || !o.employeeCode || !o.yearOfJoining || !o.participantWhatsapp || !o.participantEmail || !o.vidyalayaEmail || !o.schoolHi || !o.schoolEn ||
       !o.regionHi || !o.regionEn || !o.gender || !o.category.length ||
@@ -253,7 +273,7 @@ $('entryForm').addEventListener('submit', async e => {
     ...o
   };
   // Reserve a tab during the click gesture so the generator can open after the save is confirmed.
-  const generatorTab = window.open('about:blank', '_blank');
+  const generatorTab = window.open('about:blank', '_blank');\n  const pdfTab = window.open('about:blank', '_blank');
   const btn = $('saveBtn');
   btn.disabled = true;
   btn.textContent = 'Saving… / सहेजा जा रहा है';
@@ -273,7 +293,7 @@ $('entryForm').addEventListener('submit', async e => {
     persist();
     const status = result.pdfStatus || 'PDF status not returned';
     toast('Google Sheets save confirmed. ' + status);
-    if (result.pdfStatus === 'PDF created' && result.pdfUrl) {
+    if (result.pdfStatus === 'PDF created' && result.pdfUrl) {\n      if (pdfTab) pdfTab.location.href = result.pdfUrl; else toast('PDF created in Drive. Allow pop-ups to open it automatically.');
       if (generatorTab) {
         const params = new URLSearchParams({participantName: record.fullNameEn, participantEmail: record.participantEmail, whatsapp: record.participantWhatsapp, vidyalayaEmail: record.vidyalayaEmail, employeeCode: record.employeeCode, yearOfJoining: record.yearOfJoining, workshopTitle: record.workshopTitleEn, recordId: record.id});
         generatorTab.location.href = CERTIFICATE_GENERATOR_URL + '?' + params.toString();
@@ -284,7 +304,7 @@ $('entryForm').addEventListener('submit', async e => {
       toast('Record saved to Google Sheets, but PDF generation failed: ' + result.pdfStatus.substring(12));
     }
   } catch (err) {
-    if (generatorTab && !generatorTab.closed) generatorTab.close();
+    if (generatorTab && !generatorTab.closed) generatorTab.close();\n    if (typeof pdfTab !== 'undefined' && pdfTab && !pdfTab.closed) pdfTab.close();
     toast('Save not confirmed: ' + (err && err.message ? err.message : String(err)) +
       '. Your entries remain in the form. No redirect occurred.');
   } finally {
@@ -329,6 +349,6 @@ document.addEventListener('click',e=>{if(!e.target.closest('.year-picker-wrap'))
 
 
 
-load();
+sizeSignatureCanvas();\nload();
 </script>
 </body></html>
