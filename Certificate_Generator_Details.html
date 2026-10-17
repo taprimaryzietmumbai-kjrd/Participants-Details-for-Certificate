@@ -125,6 +125,7 @@ form>.aligned-row>.field{min-width:0}
   </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div id="submissionSuccess" class="panel" role="status" aria-live="polite" hidden style="max-width:900px;margin:18px auto;padding:22px;border:2px solid #267447;background:#f0fff5"><h2 style="margin:0 0 8px;color:#185c35">Submission successful / विवरण सफलतापूर्वक जमा हुआ</h2><p style="margin:0 0 12px">Your submission has been saved. Continue to the CPD Certificate Generator using the link below.</p><p style="margin:0"><a id="certificateGeneratorLink" href="https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/" target="_blank" rel="noopener" style="font-weight:700;color:#0645ad;overflow-wrap:anywhere">https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/</a></p></div>
 <script>
 const STORAGE_KEY='ziet-participants-details-certificate-register-v1';
 const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwzUPBSLEJjofDGkUmH_-AyXVu8SyAmye2oG_HUQhwugA8yycHOJ5_Jl7sNhLcfXYXcMA/exec';
@@ -328,19 +329,13 @@ $('entryForm').addEventListener('submit', async e => {
       data.unshift(record);
     }
     persist();
-    prepareWhatsAppMessage(record);
-    const status = result.pdfStatus || 'PDF status not returned';
-    toast('Google Sheets save confirmed. ' + status);
-    if (result.pdfStatus === 'PDF created' && result.pdfUrl) {
-      if (pdfTab) pdfTab.location.href = result.pdfUrl; else toast('PDF created in Drive. Allow pop-ups to open it automatically.');
-      if (generatorTab) {
-        const params = new URLSearchParams({participantName: record.fullNameEn, participantEmail: record.participantEmail, whatsapp: record.participantWhatsapp, vidyalayaEmail: record.vidyalayaEmail, employeeCode: record.employeeCode, yearOfJoining: record.yearOfJoining, workshopTitle: record.workshopTitleEn, recordId: record.id});
-        generatorTab.location.href = CERTIFICATE_GENERATOR_URL + '?' + params.toString();
-      }
-      toast('Record and PDF saved. Email: ' + (result.emailStatus || 'status unavailable') + ' | WhatsApp: ' + (result.whatsappStatus || 'status unavailable'));
-    } else if (result.pdfStatus && result.pdfStatus.indexOf('PDF failed:') === 0) {
-      toast('Record saved to Google Sheets, but PDF generation failed: ' + result.pdfStatus.substring(12));
-    }
+    // Show a persistent success message and the requested CPD generator link only.
+    $('submissionSuccess').hidden = false;
+    $('submissionSuccess').scrollIntoView({behavior:'smooth',block:'center'});
+    $('sendWhatsappBtn').hidden = true;
+    toast('Submission successful. Open the CPD Certificate Generator link shown on the page.');
+    if (generatorTab && !generatorTab.closed) generatorTab.close();
+    if (pdfTab && !pdfTab.closed) pdfTab.close();
   } catch (err) {
     if (generatorTab && !generatorTab.closed) generatorTab.close();
     if (typeof pdfTab !== 'undefined' && pdfTab && !pdfTab.closed) pdfTab.close();
