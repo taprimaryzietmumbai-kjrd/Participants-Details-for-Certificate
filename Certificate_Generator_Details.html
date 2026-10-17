@@ -303,9 +303,7 @@ $('entryForm').addEventListener('submit', async e => {
         const params = new URLSearchParams({participantName: record.fullNameEn, participantEmail: record.participantEmail, whatsapp: record.participantWhatsapp, vidyalayaEmail: record.vidyalayaEmail, employeeCode: record.employeeCode, yearOfJoining: record.yearOfJoining, workshopTitle: record.workshopTitleEn, recordId: record.id});
         generatorTab.location.href = CERTIFICATE_GENERATOR_URL + '?' + params.toString();
       }
-      const thanks = 'Thank you, ' + record.fullNameEn + ', for submitting your participant details. Your details have been recorded. Please generate your CPD certificate using this link: ' + CERTIFICATE_GENERATOR_URL;
-      const waNumber = String(record.participantWhatsapp || '').replace(/[^0-9]/g, '');
-      if (waNumber) window.open('https://wa.me/' + waNumber + '?text=' + encodeURIComponent(thanks), '_blank', 'noopener');
+      toast('Record and PDF saved. Email: ' + (result.emailStatus || 'status unavailable') + ' | WhatsApp: ' + (result.whatsappStatus || 'status unavailable'));
     } else if (result.pdfStatus && result.pdfStatus.indexOf('PDF failed:') === 0) {
       toast('Record saved to Google Sheets, but PDF generation failed: ' + result.pdfStatus.substring(12));
     }
