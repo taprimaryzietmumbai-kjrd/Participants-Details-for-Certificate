@@ -76,7 +76,7 @@ form>.aligned-row>.field{min-width:0}
 <div class="field"><label for="workshopTitleHi">कार्यशाला का शीर्षक — हिंदी *</label><input id="workshopTitleHi" required placeholder="हिंदी में सटीक शीर्षक"></div>
 <div class="field"><label for="startDate">कार्यशाला प्रारंभ तिथि / Workshop start date *</label><input id="startDate" type="date" required></div>
 <div class="field"><label for="endDate">कार्यशाला समाप्ति तिथि / Workshop end date *</label><input id="endDate" type="date" required></div>
-<div class="field"><label for="designationEn">Designation — English *</label><input id="designationEn" required placeholder="Designation in English"></div>
+<div class="field"><label for="designationEn">Designation — English *</label><input id="designationEn" required placeholder="Designation in English"><small class="hint" id="designationLookupStatus" aria-live="polite">Loading participant records for automatic designation…</small></div>
 <div class="field"><label for="designationHi">पदनाम — हिंदी *</label><input id="designationHi" required placeholder="हिंदी में पदनाम"></div>
 <div class="field"><label for="employeeCode">कर्मचारी कोड / Employee Code *</label><input id="employeeCode" required placeholder="Enter employee code"></div>
 <div class="field"><label for="yearOfJoining">कार्यग्रहण वर्ष / Year of Joining *</label><div class="year-picker-wrap">
@@ -125,10 +125,11 @@ const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwzUPBSLEJjofD
 const DESIGNATION_LOOKUP_API='https://script.google.com/macros/s/AKfycbxOxaBDPB8jzEgZDevEQbCdH0sNnMshtq7GhNWrvUc38-HfWWs12VXVC8UrOin-B6rLRg/exec';
 let participantLookup=[];
 let participantLookupReady=false;
+let participantLookupPromise=null;
 function cleanLookup(value){
-  return String(value||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'')
+  return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
     .toUpperCase().replace(/&AMP;/g,'&').replace(/[‐-‒–—−]/g,'-')
-    .replace(/[^A-Z0-9]+/g,' ').replace(/\\s+/g,' ').trim();
+    .replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 }
 function findMatchingParticipant(name){
   const wanted=cleanLookup(name);
@@ -139,57 +140,71 @@ function findMatchingParticipant(name){
     return names.includes(wanted);
   });
   if(matches.length===1) return matches[0];
-  // If duplicates exist, only use them when designation values agree.
   if(matches.length>1){
-    const designations=[...new Set(matches.map(p=>cleanLookup(p.designation)).filter(Boolean))];
-    return designations.length===1 ? matches[0] : null;
+    const designations=[...new Set(matches.map(p=>cleanLookup(p.designation||p.post||p.designationEn)).filter(Boolean))];
+    return designations.length===1 && designations[0] ? matches[0] : null;
   }
   return null;
 }
 function fillDesignationFromParticipant(person){
-  if(!person) return;
+  if(!person) return false;
   const en=$('designationEn'), hi=$('designationHi');
   const designation=String(person.designation||person.post||person.designationEn||'').trim();
-  if(!designation) return;
+  if(!designation) return false;
   en.value=designation;
   en.dispatchEvent(new Event('input',{bubbles:true}));
   en.dispatchEvent(new Event('change',{bubbles:true}));
   const hindi=String(person.designationHi||person.hindiDesignation||'').trim();
-  // Only fill Hindi when the source supplies a Hindi designation; never guess a translation.
-  if(hindi){ hi.value=hindi; hi.dispatchEvent(new Event('input',{bubbles:true})); hi.dispatchEvent(new Event('change',{bubbles:true})); }
-}
-async function loadParticipantDesignationLookup(){
-  try{
-    const response=await fetch(DESIGNATION_LOOKUP_API);
-    if(!response.ok) throw new Error('HTTP '+response.status);
-    const result=await response.json();
-    if(!result.success || !Array.isArray(result.sheets)) throw new Error('Participant sheet list unavailable');
-    const all=[];
-    for(const sheet of result.sheets){
-      const url=DESIGNATION_LOOKUP_API+'?sheet='+encodeURIComponent(sheet);
-      const res=await fetch(url);
-      if(!res.ok) continue;
-      const payload=await res.json();
-      if(payload.success && Array.isArray(payload.participants)) all.push(...payload.participants);
-    }
-    participantLookup=all;
-    participantLookupReady=true;
-    const name=$('fullNameEn');
-    if(name.value.trim()){
-      const match=findMatchingParticipant(name.value);
-      if(match) fillDesignationFromParticipant(match);
-    }
-  }catch(error){
-    console.warn('Automatic designation lookup unavailable:',error);
-  }
+  if(hindi){hi.value=hindi;hi.dispatchEvent(new Event('input',{bubbles:true}));hi.dispatchEvent(new Event('change',{bubbles:true}));}
+  const status=$('designationLookupStatus');
+  if(status) status.textContent='Designation loaded automatically from participant records.';
+  return true;
 }
 function updateDesignationForEnteredName(){
-  const match=findMatchingParticipant($('fullNameEn').value);
-  if(match) fillDesignationFromParticipant(match);
+  const name=$('fullNameEn').value;
+  const match=findMatchingParticipant(name);
+  if(match && fillDesignationFromParticipant(match)) return;
+  if(participantLookupReady){
+    const status=$('designationLookupStatus');
+    if(status) status.textContent=name.trim()?'No unique participant match found. Please enter the designation manually.':'Select/enter the participant name to look up designation.';
+  }
 }
+async function loadParticipantDesignationLookup(){
+  if(participantLookupPromise) return participantLookupPromise;
+  participantLookupPromise=(async()=>{
+    try{
+      const response=await fetch(DESIGNATION_LOOKUP_API);
+      if(!response.ok) throw new Error('HTTP '+response.status);
+      const result=await response.json();
+      if(!result.success || !Array.isArray(result.sheets)) throw new Error('Participant sheet list unavailable');
+      const all=[];
+      const requests=result.sheets.map(async sheet=>{
+        try{
+          const res=await fetch(DESIGNATION_LOOKUP_API+'?sheet='+encodeURIComponent(sheet));
+          if(!res.ok) return [];
+          const payload=await res.json();
+          return payload.success && Array.isArray(payload.participants)?payload.participants:[];
+        }catch(_){return [];}
+      });
+      (await Promise.all(requests)).forEach(list=>all.push(...list));
+      participantLookup=all;
+      participantLookupReady=true;
+      const status=$('designationLookupStatus');
+      if(status) status.textContent=all.length?'Participant records loaded. Enter the name exactly as listed to auto-fill designation.':'No participant records were returned; enter designation manually.';
+      updateDesignationForEnteredName();
+      return all;
+    }catch(error){
+      console.warn('Automatic designation lookup unavailable:',error);
+      const status=$('designationLookupStatus');
+      if(status) status.textContent='Automatic lookup unavailable; please enter designation manually.';
+      return [];
+    }
+  })();
+  return participantLookupPromise;
+}
+$('fullNameEn').addEventListener('input',updateDesignationForEnteredName);
 $('fullNameEn').addEventListener('change',updateDesignationForEnteredName);
 $('fullNameEn').addEventListener('blur',updateDesignationForEnteredName);
-
 const CERTIFICATE_GENERATOR_URL='https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/';
 const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','participantWhatsapp','participantEmail','vidyalayaEmail','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 let data=[],editingId=null;
