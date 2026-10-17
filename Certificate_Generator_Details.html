@@ -76,7 +76,7 @@ form>.aligned-row>.field{min-width:0}
 <div class="field"><label for="workshopTitleHi">कार्यशाला का शीर्षक — हिंदी *</label><input id="workshopTitleHi" required placeholder="हिंदी में सटीक शीर्षक"></div>
 <div class="field"><label for="startDate">कार्यशाला प्रारंभ तिथि / Workshop start date *</label><input id="startDate" type="date" required></div>
 <div class="field"><label for="endDate">कार्यशाला समाप्ति तिथि / Workshop end date *</label><input id="endDate" type="date" required></div>
-<div class="field"><label for="designationEn">Designation — English *</label><input id="designationEn" required placeholder="Designation in English"><small class="hint" id="designationLookupStatus" aria-live="polite">Loading participant records for automatic designation…</small></div>
+<div class="field"><label for="designationEn">Designation — English *</label><select id="designationEn" required><option value="">-- Select Post / Designation --</option><option>Principal</option><option>Vice-Principal</option><option>Headmaster / Headmistress</option><option>Librarian</option><option>PGT (English)</option><option>PGT (Hindi)</option><option>PGT (Physics)</option><option>PGT (Chemistry)</option><option>PGT (Mathematics)</option><option>PGT (Economics)</option><option>PGT (History)</option><option>PGT (Geography)</option><option>PGT (Commerce)</option><option>PGT (Biology)</option><option>PGT (Bio-Technology)</option><option>TGT (Hindi)</option><option>TGT (English)</option><option>TGT (Sanskrit)</option><option>TGT (Social Studies)</option><option>TGT (Mathematics)</option><option>TGT (Science)</option><option>TGT (Physical & Health Edn.)</option><option>TGT (Art Education)</option><option>TGT (Work Experience)</option><option>Special Educator (TGT)</option><option>Special Educator (PRT)</option><option>PRT</option><option>PRT(Music)</option><option>Administrative Officer</option><option>Finance Officer</option><option>Assistant Engineer</option><option>Assistant Section Officer</option><option>Junior Translator</option><option>Sr. Secretariat Assistant</option><option>Jr. Secretariat Assistant</option><option>Steno Gr I</option><option>Steno Gr II</option><option>WET</option><option>AET</option><option>PRTM</option><option>JSA</option><option>SSA</option><option>SO</option><option>AO</option></select><small class="hint" id="designationLookupStatus" aria-live="polite">Loading participant records for automatic designation…</small></div>
 <div class="field"><label for="designationHi">पदनाम — हिंदी *</label><input id="designationHi" required placeholder="हिंदी में पदनाम"></div>
 <div class="field"><label for="employeeCode">कर्मचारी कोड / Employee Code *</label><input id="employeeCode" required placeholder="Enter employee code"></div>
 <div class="field"><label for="yearOfJoining">कार्यग्रहण वर्ष / Year of Joining *</label><div class="year-picker-wrap">
@@ -133,18 +133,29 @@ function cleanLookup(value){
     .toUpperCase().replace(/&AMP;/g,'&').replace(/[‐-‒–—−]/g,'-')
     .replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 }
+function cleanDesignation(value){
+  return String(value||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase()
+    .replace(/&AMP;/g,'&').replace(/[‐-‒–—−]/g,'-').replace(/[^A-Z0-9]+/g,' ').replace(/\\s+/g,' ').trim();
+}
 function fillParticipantDetails(person){
   if(!person) return;
   const set=(id,value)=>{if(value!==undefined&&value!==null&&String(value).trim()!=='') $(id).value=String(value).trim();};
   set('fullNameHi',person.hindiName||person.fullNameHi);
-  set('designationEn',person.designation||person.post||person.designationEn);
+  const designation=String(person.designation||person.post||person.designationEn||'').trim();
+  if(designation){
+    const select=$('designationEn');
+    const option=Array.from(select.options).find(o=>cleanDesignation(o.value||o.textContent)===cleanDesignation(designation));
+    if(option) select.value=option.value;
+    else select.value='';
+    select.dispatchEvent(new Event('change',{bubbles:true}));
+  }
   set('designationHi',person.designationHi||person.hindiDesignation);
   set('schoolEn',person.school||person.vidyalaya||person.schoolEn);
   set('regionEn',person.region||person.regionEn);
   const status=$('participantLookupStatus');
   if(status) status.textContent='Participant details loaded from the live participant list.';
   const designationStatus=$('designationLookupStatus');
-  if(designationStatus) designationStatus.textContent='Designation populated from the selected participant record.';
+  if(designationStatus) designationStatus.textContent=designation ? (Array.from($('designationEn').options).some(o=>cleanDesignation(o.value||o.textContent)===cleanDesignation(designation))?'Designation selected automatically.':'Designation not in the list; please select it manually.') : 'No designation is available for this participant.';
 }
 function loadParticipantDesignationLookup(){
   const select=$('fullNameEn');
