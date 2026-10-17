@@ -117,6 +117,7 @@ form>.aligned-row>.field{min-width:0}
       <div class="actions">
         <button class="primary" type="submit" form="entryForm" id="saveBtn">＋ विवरण सहेजें / Save record</button>
         <button class="plain" type="button" id="resetBtn">फ़ॉर्म साफ़ करें / Clear form</button>
+        <button class="secondary" type="button" id="sendWhatsappBtn" hidden>Send WhatsApp Thank-You Message / WhatsApp संदेश भेजें</button>
       </div>
       <p class="footnote">Workshop title, start date and end date must be entered for each record. No title, dates or CPD hours are assumed. Data is saved in this browser on this device; export a backup regularly.</p>
     </section>
@@ -295,6 +296,7 @@ $('entryForm').addEventListener('submit', async e => {
       data.unshift(record);
     }
     persist();
+    prepareWhatsAppMessage(record);
     const status = result.pdfStatus || 'PDF status not returned';
     toast('Google Sheets save confirmed. ' + status);
     if (result.pdfStatus === 'PDF created' && result.pdfUrl) {
@@ -318,6 +320,17 @@ $('entryForm').addEventListener('submit', async e => {
   }
 });
 $('resetBtn').onclick=clearForm;
+$('sendWhatsappBtn').addEventListener('click',()=>{
+  const url=$('sendWhatsappBtn').dataset.url;
+  if(url) window.open(url,'_blank','noopener');
+});
+function prepareWhatsAppMessage(record){
+  const phone=String(record.participantWhatsapp||'').replace(/[^0-9]/g,'');
+  if(!phone){$('sendWhatsappBtn').hidden=true;return;}
+  const message='नमस्कार '+(record.fullNameEn||'Participant')+',\n\nThank you for participating in the training programme organised by ZIET Mumbai.\n\nYou can access the CPD Certificate Generator here:\n'+CERTIFICATE_GENERATOR_URL+'\n\nWarm regards,\nZIET Mumbai';
+  $('sendWhatsappBtn').dataset.url='https://wa.me/'+phone+'?text='+encodeURIComponent(message);
+  $('sendWhatsappBtn').hidden=false;
+}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
   $('total').textContent=data.length;
