@@ -136,7 +136,6 @@ function cleanLookup(value){
 function fillParticipantDetails(person){
   if(!person) return;
   const set=(id,value)=>{if(value!==undefined&&value!==null&&String(value).trim()!=='') $(id).value=String(value).trim();};
-  set('fullNameEn',person.name||person.fullNameEn||person.fullName);
   set('fullNameHi',person.hindiName||person.fullNameHi);
   set('designationEn',person.designation||person.post||person.designationEn);
   set('designationHi',person.designationHi||person.hindiDesignation);
@@ -196,7 +195,7 @@ $('fullNameEn').addEventListener('change',()=>{
 function load(){try{data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){data=[]}render()}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render()}
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
-function formData(){const o={};fields.forEach(k=>{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim()});return o}
+function formData(){const o={};fields.forEach(k=>{if(k==='fullNameEn'){const person=participantLookup[Number($('fullNameEn').value)];o[k]=person?String(person.name||person.fullNameEn||person.fullName||'').trim():'';}else{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim();}});return o}
 function clearForm(){ $('entryForm').reset();$('formTitle').textContent='प्रतिभागी का विवरण जोड़ें / Add participant details';$('saveBtn').textContent='＋ विवरण सहेजें / Save record';editingId=null}
 function postRecordAndWaitForResult(payload) {
   return new Promise((resolve, reject) => {
