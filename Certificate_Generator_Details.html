@@ -330,8 +330,16 @@ $('entryForm').addEventListener('submit', async e => {
     $('submissionSuccess').scrollIntoView({behavior:'smooth',block:'center'});
     toast('Submission successful. Open the CPD Certificate Generator link shown on the page.');
   } catch (err) {
-    toast('Save not confirmed: ' + (err && err.message ? err.message : String(err)) +
-      '. Your entries remain in the form. No redirect occurred.');
+    // Always provide the next-step link if the backend saved the row but its
+    // postMessage confirmation was blocked or lost. Do not label this as confirmed.
+    const successPanel = $('submissionSuccess');
+    const successHeading = successPanel.querySelector('h2');
+    const successText = successPanel.querySelector('p');
+    if (successHeading) successHeading.textContent = 'Submission status / जमा करने की स्थिति';
+    if (successText) successText.textContent = 'The form did not receive a server confirmation. Your record may still have been saved; check the participant register before submitting again. If the record is present, continue using the CPD Certificate Generator link below.';
+    successPanel.hidden = false;
+    successPanel.scrollIntoView({behavior:'smooth',block:'center'});
+    toast('Confirmation was not returned. Check the participant register; the next-step link is shown on the page.');
   } finally {
     btn.disabled = false;
     btn.textContent = editingId ? 'परिवर्तन सहेजें / Save changes' : '＋ विवरण सहेजें / Save record';
