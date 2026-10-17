@@ -120,7 +120,8 @@ form>.aligned-row>.field{min-width:0}
   </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
-<div id="submissionSuccess" class="panel" role="status" aria-live="polite" hidden style="max-width:900px;margin:18px auto;padding:22px;border:2px solid #267447;background:#f0fff5"><h2 style="margin:0 0 8px;color:#185c35">Submission successful / विवरण सफलतापूर्वक जमा हुआ</h2><p style="margin:0 0 12px">Your submission has been saved. Continue to the CPD Certificate Generator using the link below.</p><p style="margin:0"><a id="certificateGeneratorLink" href="https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/" target="_blank" rel="noopener" style="font-weight:700;color:#0645ad;overflow-wrap:anywhere">https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/</a></p></div>
+<div id="submissionSuccess" class="panel" role="status" aria-live="polite" hidden style="max-width:900px;margin:18px auto;padding:22px;border:2px solid #267447;background:#f0fff5"><h2 style="margin:0 0 8px;color:#185c35">Submission successful / विवरण सफलतापूर्वक जमा हुआ</h2>
+<button type="button" id="printRecordBtn" class="primary" style="margin:10px 0 12px">Save details as PDF / Print विवरण</button><p style="margin:0 0 12px">Your submission has been saved. Continue to the CPD Certificate Generator using the link below.</p><p style="margin:0"><a id="certificateGeneratorLink" href="https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/" target="_blank" rel="noopener" style="font-weight:700;color:#0645ad;overflow-wrap:anywhere">https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/</a></p></div>
 <script>
 const STORAGE_KEY='ziet-participants-details-certificate-register-v1';
 const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwzUPBSLEJjofDGkUmH_-AyXVu8SyAmye2oG_HUQhwugA8yycHOJ5_Jl7sNhLcfXYXcMA/exec';
@@ -339,6 +340,34 @@ $('entryForm').addEventListener('submit', async e => {
     btn.disabled = false;
     btn.textContent = editingId ? 'परिवर्तन सहेजें / Save changes' : '＋ विवरण सहेजें / Save record';
   }
+});
+$('printRecordBtn').addEventListener('click',()=>{
+  const record=data[0];
+  if(!record){toast('No saved record is available to print.');return;}
+  const labels={
+    fullNameEn:'Participant name',fullNameHi:'प्रतिभागी का नाम',recordType:'Certificate category',
+    workshopTitleEn:'Workshop title',workshopTitleHi:'कार्यशाला का शीर्षक',
+    startDate:'Workshop start date',endDate:'Workshop end date',
+    designationEn:'Designation',designationHi:'पदनाम',employeeCode:'Employee code',
+    yearOfJoining:'Year of joining',participantWhatsapp:'WhatsApp number',
+    participantEmail:'Participant email',vidyalayaEmail:'Vidyalaya email',
+    schoolEn:'Vidyalaya',schoolHi:'विद्यालय',regionEn:'Region',regionHi:'क्षेत्र',
+    gender:'Gender',category:'Category',cpd:'CPD hours',certDate:'Certificate date',
+    attendance:'Submission status',notesEn:'Remarks',notesHi:'टिप्पणी'
+  };
+  const rows=Object.entries(labels).map(([key,label])=>{
+    const value=record[key];
+    const shown=Array.isArray(value)?value.join(', '):(value??'');
+    return '<tr><th>'+esc(label)+'</th><td>'+esc(shown)+'</td></tr>';
+  }).join('');
+  const photo=record.participantPhotoDataUrl?'<img class="portrait" src="'+record.participantPhotoDataUrl+'" alt="Participant photo">':'';
+  const signature=record.signatureDataUrl?'<img class="signature" src="'+record.signatureDataUrl+'" alt="Participant signature">':'';
+  const win=window.open('','_blank');
+  if(!win){toast('Allow pop-ups to open the print view.');return;}
+  win.document.open();
+  win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Participant Details</title><style>body{font:14px Arial,sans-serif;color:#222;margin:24px}h1{font-size:20px;text-align:center}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #bbb;padding:7px;text-align:left;vertical-align:top}th{width:30%;background:#f4f4f4}.portrait{width:100px;height:120px;object-fit:cover;display:block;margin:12px auto}.signature{max-width:220px;max-height:80px;display:block;margin:12px auto}.actions{margin:0 0 14px}@media print{.actions{display:none}body{margin:10mm}tr{break-inside:avoid}}</style></head><body><div class="actions"><button onclick="window.print()">Save as PDF / Print</button></div><h1>Kendriya Vidyalaya Sangathan — ZIET Mumbai<br>Participant Details</h1>'+photo+'<table>'+rows+'</table><h3>Participant signature</h3>'+signature+'</body></html>');
+  win.document.close();
+  win.focus();
 });
 $('resetBtn').onclick=clearForm;
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
