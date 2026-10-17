@@ -68,7 +68,7 @@ form>.aligned-row>.field{min-width:0}
       <p class="sub">प्रमाण-पत्र में छपने वाला विवरण ठीक उसी रूप में दर्ज करें। कार्यशाला का शीर्षक और तिथियाँ प्रतिभागी से ही लें। * से चिह्नित फ़ील्ड अनिवार्य हैं। / Enter details exactly as they should appear on the certificate. Obtain the workshop title and dates from the participant. Fields marked * are required.</p>
       <form id="entryForm">
 <div class="field full"><label for="salutation">संबोधन / Salutation * (एक या अधिक चुनें / Select one or more)</label><select id="salutation" multiple size="4" required aria-describedby="salutationHint"><option value="Shri">श्री / Shri</option><option value="Smt.">श्रीमती / Smt.</option><option value="Miss">सुश्री / Miss</option><option value="Dr.">डॉ. / Dr.</option></select><small class="hint" id="salutationHint">एक या अधिक संबोधन चुनें / Select one or more salutations.</small></div>
-<div class="field"><label for="fullNameEn">Select participant — English name *</label><select id="fullNameEn" required><option value="">Loading participant list…</option></select><small class="hint" id="participantLookupStatus" aria-live="polite">Loading live participant list…</small></div>
+<div class="field"><label for="fullNameEn">Participant name — type or speak *</label><input id="fullNameEn" type="text" list="participantOptions" required autocomplete="off" placeholder="Type a name or use voice typing"><datalist id="participantOptions"></datalist><small class="hint" id="participantLookupStatus" aria-live="polite">Loading participant suggestions… You can also type or dictate the name.</small></div>
 <div class="field"><label for="fullNameHi">पूरा नाम — हिंदी *</label><input id="fullNameHi" required placeholder="हिंदी में नाम"></div>
 <div class="field"><label for="recordType">प्रमाण-पत्र की श्रेणी / प्रमाण-पत्र category *</label><select id="recordType"><option value="">श्रेणी चुनें / Select category</option><option value="Participant">प्रतिभागी / Participant</option><option value="Resource Person">संसाधन व्यक्ति / Resource Person</option></select></div>
 <div class="field"><label for="gender">Gender</label><select id="gender" required><option value="">चुनें / Select</option><option>महिला / Female</option><option>पुरुष / Male</option><option>बताना नहीं चाहते / Prefer not to say</option></select></div>
@@ -175,12 +175,13 @@ function loadParticipantDesignationLookup(){
         if(!byKey.has(key)) byKey.set(key,{...person,name});
       });
       participantLookup=Array.from(byKey.values()).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-      select.innerHTML='<option value="">-- Select participant --</option>';
-      participantLookup.forEach((person,index)=>{
+      const suggestions=$('participantOptions');
+      suggestions.innerHTML='';
+      participantLookup.forEach(person=>{
         const option=document.createElement('option');
-        option.value=String(index);
-        option.textContent=person.name+(person.designation?' — '+person.designation:'')+(person.school?' — '+person.school:'');
-        select.appendChild(option);
+        option.value=person.name;
+        option.label=[person.designation,person.school].filter(Boolean).join(' — ');
+        suggestions.appendChild(option);
       });
       participantLookupReady=true;
       if(status) status.textContent=participantLookup.length
@@ -189,19 +190,26 @@ function loadParticipantDesignationLookup(){
     })
     .catch(error=>{
       console.error('Could not load live participant list:',error);
-      select.innerHTML='<option value="">Participant list unavailable</option>';
-      if(status) status.textContent='Could not load the live participant list. Designation will need manual entry.';
+      $('participantOptions').innerHTML='';
+      if(status) status.textContent='Could not load participant suggestions. You can still type or dictate the name; fill remaining details manually.';
     });
 }
-$('fullNameEn').addEventListener('change',()=>{
-  const index=$('fullNameEn').value;
-  if(index!==''&&participantLookup[index]) fillParticipantDetails(participantLookup[index]);
+function matchTypedParticipant(){
+  const typed=cleanLookup($('fullNameEn').value);
+  if(!typed) return;
+  const person=participantLookup.find(p=>cleanLookup(p.name||p.fullNameEn||p.fullName)===typed);
+  if(person) fillParticipantDetails(person);
+}
+$('fullNameEn').addEventListener('change',matchTypedParticipant);
+$('fullNameEn').addEventListener('input',()=>{
+  // Fill only on an exact match; never infer designation from a partial or unrelated name.
+  matchTypedParticipant();
 });
 
 function load(){try{data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){data=[]}render()}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));render()}
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400)}
-function formData(){const o={};fields.forEach(k=>{if(k==='fullNameEn'){const person=participantLookup[Number($('fullNameEn').value)];o[k]=person?String(person.name||person.fullNameEn||person.fullName||'').trim():'';}else{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim();}});return o}
+function formData(){const o={};fields.forEach(k=>{if(k==='fullNameEn'){o[k]=$('fullNameEn').value.trim();}else{o[k]=['category','salutation'].includes(k)?Array.from($(k).selectedOptions).map(opt=>opt.value):$(k).value.trim();}});return o}
 function clearForm(){ $('entryForm').reset();$('formTitle').textContent='प्रतिभागी का विवरण जोड़ें / Add participant details';$('saveBtn').textContent='＋ विवरण सहेजें / Save record';editingId=null}
 function postRecordAndWaitForResult(payload) {
   return new Promise((resolve, reject) => {
