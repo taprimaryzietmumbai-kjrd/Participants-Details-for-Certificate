@@ -120,6 +120,76 @@ form>.aligned-row>.field{min-width:0}
 <script>
 const STORAGE_KEY='ziet-participants-details-certificate-register-v1';
 const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwzUPBSLEJjofDGkUmH_-AyXVu8SyAmye2oG_HUQhwugA8yycHOJ5_Jl7sNhLcfXYXcMA/exec';
+/* Live participant lookup reused from the Arriving Participant's Facilitation Hub.
+   Selecting a matching participant fills Designation (English and Hindi) automatically. */
+const DESIGNATION_LOOKUP_API='https://script.google.com/macros/s/AKfycbxOxaBDPB8jzEgZDevEQbCdH0sNnMshtq7GhNWrvUc38-HfWWs12VXVC8UrOin-B6rLRg/exec';
+let participantLookup=[];
+let participantLookupReady=false;
+function cleanLookup(value){
+  return String(value||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'')
+    .toUpperCase().replace(/&AMP;/g,'&').replace(/[‐-‒–—−]/g,'-')
+    .replace(/[^A-Z0-9]+/g,' ').replace(/\\s+/g,' ').trim();
+}
+function findMatchingParticipant(name){
+  const wanted=cleanLookup(name);
+  if(!wanted) return null;
+  const matches=participantLookup.filter(p=>{
+    const names=[p.name,p.hindiName,p.fullName,p.fullNameEn,p.fullNameHi]
+      .map(cleanLookup).filter(Boolean);
+    return names.includes(wanted);
+  });
+  if(matches.length===1) return matches[0];
+  // If duplicates exist, only use them when designation values agree.
+  if(matches.length>1){
+    const designations=[...new Set(matches.map(p=>cleanLookup(p.designation)).filter(Boolean))];
+    return designations.length===1 ? matches[0] : null;
+  }
+  return null;
+}
+function fillDesignationFromParticipant(person){
+  if(!person) return;
+  const en=$('designationEn'), hi=$('designationHi');
+  const designation=String(person.designation||person.post||person.designationEn||'').trim();
+  if(!designation) return;
+  en.value=designation;
+  en.dispatchEvent(new Event('input',{bubbles:true}));
+  en.dispatchEvent(new Event('change',{bubbles:true}));
+  const hindi=String(person.designationHi||person.hindiDesignation||'').trim();
+  // Only fill Hindi when the source supplies a Hindi designation; never guess a translation.
+  if(hindi){ hi.value=hindi; hi.dispatchEvent(new Event('input',{bubbles:true})); hi.dispatchEvent(new Event('change',{bubbles:true})); }
+}
+async function loadParticipantDesignationLookup(){
+  try{
+    const response=await fetch(DESIGNATION_LOOKUP_API);
+    if(!response.ok) throw new Error('HTTP '+response.status);
+    const result=await response.json();
+    if(!result.success || !Array.isArray(result.sheets)) throw new Error('Participant sheet list unavailable');
+    const all=[];
+    for(const sheet of result.sheets){
+      const url=DESIGNATION_LOOKUP_API+'?sheet='+encodeURIComponent(sheet);
+      const res=await fetch(url);
+      if(!res.ok) continue;
+      const payload=await res.json();
+      if(payload.success && Array.isArray(payload.participants)) all.push(...payload.participants);
+    }
+    participantLookup=all;
+    participantLookupReady=true;
+    const name=$('fullNameEn');
+    if(name.value.trim()){
+      const match=findMatchingParticipant(name.value);
+      if(match) fillDesignationFromParticipant(match);
+    }
+  }catch(error){
+    console.warn('Automatic designation lookup unavailable:',error);
+  }
+}
+function updateDesignationForEnteredName(){
+  const match=findMatchingParticipant($('fullNameEn').value);
+  if(match) fillDesignationFromParticipant(match);
+}
+$('fullNameEn').addEventListener('change',updateDesignationForEnteredName);
+$('fullNameEn').addEventListener('blur',updateDesignationForEnteredName);
+
 const CERTIFICATE_GENERATOR_URL='https://taprimaryzietmumbai-kjrd.github.io/ZIET-CPD-Certificate-Generator-/';
 const fields=['salutation','fullNameHi','fullNameEn','recordType','workshopTitleHi','workshopTitleEn','startDate','endDate','designationHi','designationEn','employeeCode','yearOfJoining','participantWhatsapp','participantEmail','vidyalayaEmail','schoolHi','schoolEn','regionHi','regionEn','gender','category','cpd','certDate','attendance','notesHi','notesEn'];
 let data=[],editingId=null;
@@ -315,6 +385,6 @@ $('fullNameEn').addEventListener('input',()=>{
 $('fullNameHi').addEventListener('input',()=>{$('fullNameHi').dataset.userEdited='true';});
 $('fullNameEn').addEventListener('input',()=>{if(!$('fullNameHi').value.trim())$('fullNameHi').dataset.userEdited='';});
 
-load();
+load();\nloadParticipantDesignationLookup();
 </script>
 </body></html>
